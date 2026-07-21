@@ -2,10 +2,14 @@ use bevy::prelude::*;
 
 
 #[derive(Component)]
-struct Person;
+struct Entity{
+    id: String,
+}
 
 #[derive(Component)]
-struct Name(String);
+struct Monster {
+    monster_type: MonsterType,
+}
 
 #[derive(Resource)]
 struct GreetTimer(Timer);
@@ -16,40 +20,52 @@ pub struct HelloPlugin;
 impl Plugin for HelloPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(GreetTimer(Timer::from_seconds(2.0, TimerMode::Repeating)));
-        app.add_systems(Startup, add_people);
-        app.add_systems(Update, (update_people, greet_people).chain());
+        app.add_systems(Startup, (startup_message, add_monsters));
+        app.add_systems(Update, list_monster);
     }
 }
 
 
 
-fn add_people(mut commands: Commands) {
-    commands.spawn((Person, Name("Jean".to_string())));
-    commands.spawn((Person, Name("Lucas".to_string())));
-    commands.spawn((Person, Name("Mathis".to_string())));
+fn add_monsters(mut commands: Commands) {
+    commands.spawn((Entity{id: "John".to_string()}, Monster{monster_type: MonsterType::Zombie}));
+    commands.spawn((Entity{id: "Ellen".to_string()}, Monster{monster_type: MonsterType::Enderman}));
+    commands.spawn((Entity{id: "Arachnida".to_string()}, Monster{monster_type: MonsterType::Spider}));
+    commands.spawn(Entity{id: "Steve".to_string()});
     
     
 }
 
-fn greet_people(time: Res<Time>, mut timer: ResMut<GreetTimer>, query: Query<&Name, With<Person>>){
+fn list_monster(
+    time : Res<Time>,
+    mut timer : ResMut<GreetTimer>,
+    entity_query : Query<(&Entity, &Monster)>
+) {
     if timer.0.tick(time.delta()).just_finished() {
-        for name in &query {
-            println!("Hello {} !", name.0);
+        for entity in entity_query.iter() {
+            let monster_name = match entity.1.monster_type {
+                MonsterType::Enderman => "Enderman",
+                MonsterType::Zombie => "Zombie",
+                MonsterType::Spider => "Spider",
+
+            };
+            println!("{} is a {}", entity.0.id, monster_name);
+            
         }
     }
 }
 
-fn update_people(mut query: Query<&mut Name, With<Person>>) {
-    for mut name in &mut query {
-        if name.0 == "Lucas" {
-            name.0 = "Lucas le plus beau".to_string();
-            break; // We don't need to change any other names.
-        }
-    }
+fn startup_message() {
+    println!("Hello world this is RustCraft speaking !");
 }
 
 
-
+enum MonsterType {
+    Zombie,
+    Spider,
+    Enderman
+    
+}
 
 fn main() {
     App::new()
