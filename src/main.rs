@@ -2,9 +2,10 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    DefaultPlugins, color::palettes::basic::{SILVER}, dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin, FrameTimeGraphConfig}, input::mouse::AccumulatedMouseMotion, prelude::*, text::FontSmoothing, window::{CursorGrabMode, CursorOptions, PresentMode},
+    DefaultPlugins, asset::processor::InitializeError::FailedToReadSourcePaths, color::palettes::{basic::SILVER, css::WHITE}, dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin, FrameTimeGraphConfig}, input::{common_conditions::input_just_pressed, keyboard::Key, mouse::AccumulatedMouseMotion}, prelude::*, scene, text::FontSmoothing, transform, window::{CursorGrabMode, CursorOptions, PresentMode},
 
 };
+use bevy::world_serialization::WorldInstanceReady;
 
 
 
@@ -27,7 +28,14 @@ impl Default for CameraSensitivity {
 #[derive(Resource, Default, )]
 struct GameState {
     is_mouse_grabbed: bool,
+    is_debug_texture_enabled: bool,
 }
+
+#[derive(Component)]
+struct PendingTextureChange;
+
+#[derive(Component)]
+struct HasTexture;
 
 
 
@@ -76,7 +84,10 @@ fn main() {
         ))
         .add_systems(Startup, (setup_camera, setup_light, setup_shapes))
         .add_systems(Update, (move_camera, grab_mouse))
-        .init_resource::<GameState>()
+        .add_systems(Update, toggle_texture_debug_state.run_if(input_just_pressed(KeyCode::AltLeft)))
+        .add_systems(Update, toggle_texture_debug.run_if(input_just_pressed(KeyCode::AltLeft)))
+        .add_observer(change_texture)
+        .insert_resource(GameState{is_mouse_grabbed: false, is_debug_texture_enabled: false})
         .run();
 }
 
@@ -100,6 +111,16 @@ fn grab_mouse(
     }
 }
 
+fn toggle_texture_debug_state(
+    mut gamestate: ResMut<GameState>
+){
+    if gamestate.is_debug_texture_enabled {
+        gamestate.is_debug_texture_enabled = false;
+    } else {
+        gamestate.is_debug_texture_enabled = true;
+    }
+}
+
 fn setup_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(), 
@@ -118,6 +139,13 @@ fn setup_light(mut commands: Commands) {
         },
         Transform::from_xyz(5., 5., 5.)
     ));
+
+    commands.insert_resource(GlobalAmbientLight {
+        color: WHITE.into(),
+        brightness: 200.0,
+        ..default()
+    });
+
 
 }
 
@@ -143,11 +171,34 @@ fn setup_shapes(
         MeshMaterial3d(materials.add(Color::from(SILVER))),
     ));
 
+  
+
+    let spider_model : Handle<WorldAsset> = asset_server
+        .load(GltfAssetLabel::Scene(0).from_asset("models/model.gltf"));
+
+    
+
+
+
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::default().mesh())),
-        MeshMaterial3d(grass_texture),
-        Transform::from_xyz(0.0, 1.0, 0.0).with_scale(Vec3::new(2.0, 2.0, 2.0)).with_rotation(Quat::from_rotation_y(30_f32.to_radians()))
+        WorldAssetRoot(spider_model.clone()),
+        Transform::from_xyz(0.0, 1.0, 5.0),
+        PendingTextureChange,
+        HasTexture
     ));
+
+    let mut iterator = 0;
+
+    while iterator < 10{
+
+
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::default().mesh())),
+            MeshMaterial3d(grass_texture.clone()),
+            Transform::from_xyz(iterator as f32, 0.5, 0.0).with_scale(Vec3::new(1., 1., 1.))
+        ));
+        iterator+=1;
+    }
 
 
 }
@@ -207,3 +258,66 @@ fn move_camera(camera: Single<(&mut Transform, &CameraSensitivity)>, time: Res<T
 }
 
 
+fn change_texture(
+    trigger: On<WorldInstanceReady>,
+    query: Query<Entity, With<PendingTextureChange>>,
+    children_query: Query<&Children>,
+    mesh_query: Query<&Mesh3d>,
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
+) {
+    let root = trigger.event_target();
+
+    if query.get(root).is_err() {
+        return;
+    }
+
+    let spider_material = materials.add(StandardMaterial {
+        base_color_texture: Some(asset_server.load("minecraft/textures/entity/spider/spider.png")),
+        ..default()
+    });
+
+    for descendant in children_query.iter_descendants(root) {
+        if mesh_query.get(descendant).is_ok() {
+            commands.entity(descendant).insert(MeshMaterial3d(spider_material.clone()));
+        }
+    }
+
+    commands.entity(root).remove::<PendingTextureChange>();
+}
+
+
+fn toggle_texture_debug(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
+    query: Query<Entity, With<HasTexture>>,
+    children_query: Query<&Children>,
+    mesh_query: Query<&Mesh3d>,
+    gamestate: Res<GameState>,
+) {
+    for root in query {
+        for descendant in children_query.iter_descendants(root) {
+            if mesh_query.get(descendant).is_err() {
+                continue;
+            }
+
+            if gamestate.is_debug_texture_enabled {
+                commands.entity(descendant).remove::<MeshMaterial3d<StandardMaterial>>();
+                let spider_material = materials.add(StandardMaterial {
+                    base_color_texture: Some(asset_server.load("models/spider.png")),
+                    ..default()
+                });
+                commands.entity(descendant).insert(MeshMaterial3d(spider_material));
+            } else {
+                commands.entity(descendant).remove::<MeshMaterial3d<StandardMaterial>>();
+                let spider_material = materials.add(StandardMaterial {
+                    base_color_texture: Some(asset_server.load("minecraft/textures/entity/spider/spider.png")),
+                    ..default()
+                });
+                commands.entity(descendant).insert(MeshMaterial3d(spider_material));
+            }
+        }
+    }
+}
