@@ -1,5 +1,7 @@
 use crate::GameState;
-use crate::player::{Player, PlayerCameraSensitivity};
+use crate::player::{Player, PlayerCamera, PlayerCameraSensitivity, PlayerFlashLight};
+use crate::spawn_objects::spawn_object;
+
 use bevy::{
     input::mouse::AccumulatedMouseMotion,
     prelude::*,
@@ -7,27 +9,45 @@ use bevy::{
 };
 use bevy_rapier3d::prelude::*;
 
+use crate::player::PlayerVar;
+
 use std::f32::consts::FRAC_PI_2;
 
 const SPEED: f32 = 6.0;
-const JUMP_FORCE: f32 = 8.0;
+const JUMP_FORCE: f32 = 4.0;
 const GROUND_CHECK_DISTANCE: f32 = 1.0;
+const SPAWN_POINT: Vec3 = Vec3::new(0.0, 2.0, 0.0);
 
 pub struct PlayerInputPlugin;
 
 impl Plugin for PlayerInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (handle_input, grab_mouse, player_jump));
+        app.add_systems(Startup, spawn_crosshair)
+            .add_systems(Update, (handle_input, grab_mouse, player_jump, check_fall));
     }
 }
 
 fn handle_input(
     gamestate: Res<GameState>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut Transform, &mut Velocity, &PlayerCameraSensitivity), With<Player>>,
+    mut player_query: Query<
+        (&mut Transform, &mut Velocity, &PlayerCameraSensitivity),
+        With<Player>,
+    >,
+    mut camera_query: Query<&mut Transform, (With<PlayerCamera>, Without<Player>)>,
+    mut player_var: ResMut<PlayerVar>,
     accumulated_mouse_motion: Res<AccumulatedMouseMotion>,
+    commands: Commands,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<StandardMaterial>>,
+    time: Res<Time>,
 ) {
-    let Ok((mut transform, mut velocity, playercamerasensitivity)) = query.single_mut() else {
+    let Ok((mut transform, mut velocity, playercamerasensitivity)) = player_query.single_mut()
+    else {
+        return;
+    };
+
+    let Ok(mut camera_transform) = camera_query.single_mut() else {
         return;
     };
 
@@ -46,39 +66,75 @@ fn handle_input(
         direction += *transform.right();
     }
 
-    // on ignore la composante Y pour ne pas "voler" en regardant en haut/bas
+    if keyboard.pressed(KeyCode::KeyR) {
+        transform.translation = SPAWN_POINT;
+    }
+
+    if keyboard.pressed(KeyCode::KeyT) {
+        spawn_object(commands, meshes, materials);
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyL) {
+        if player_var.flashlight {
+            player_var.flashlight = false;
+        } else {
+            player_var.flashlight = true;
+        }
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyE) {
+        let dash_dir = *transform.forward();
+
+        velocity.linear.x = dash_dir.x * 20.0;
+        velocity.linear.z = dash_dir.z * 20.0;
+    }
+
     direction.y = 0.0;
     let direction = direction.normalize_or_zero();
 
-    velocity.linear.x = direction.x * SPEED;
-    velocity.linear.z = direction.z * SPEED;
+    if keyboard.pressed(KeyCode::ShiftLeft) && !player_var.crouching {
+        player_var.sprinting = true;
+    } else {
+        player_var.sprinting = false;
+    }
+
+    if keyboard.pressed(KeyCode::KeyC) && !player_var.sprinting {
+        player_var.crouching = true;
+    } else {
+        player_var.crouching = false;
+    }
+
+    let goal_speed = if player_var.sprinting {
+        SPEED * 3.0
+    } else if player_var.crouching {
+        SPEED / 4.0
+    } else {
+        SPEED
+    };
+
+    let target_velocity = Vec3::new(direction.x * goal_speed, 0.0, direction.z * goal_speed);
+    let current = Vec3::new(velocity.linear.x, 0.0, velocity.linear.z);
+    let new_vel = current.lerp(target_velocity, time.delta_secs() * 4.0);
+    velocity.linear.x = new_vel.x;
+    velocity.linear.z = new_vel.z;
 
     let delta = accumulated_mouse_motion.delta;
 
     if gamestate.mouse_grabbed {
         if delta != Vec2::ZERO {
-            // Note that we are not multiplying by delta_time here.
-            // The reason is that for mouse movement, we already get the full movement that happened since the last frame.
-            // This means that if we multiply by delta_time, we will get a smaller rotation than intended by the user.
-            // This situation is reversed when reading e.g. analog input from a gamepad however, where the same rules
-            // as for keyboard input apply. Such an input should be multiplied by delta_time to get the intended rotation
-            // independent of the framerate.
             let delta_yaw = -delta.x * playercamerasensitivity.x;
             let delta_pitch = -delta.y * playercamerasensitivity.y;
 
-            let (yaw, pitch, roll) = transform.rotation.to_euler(EulerRot::YXZ);
+            // Yaw sur le Player (corps + collider)
+            let (yaw, _, _) = transform.rotation.to_euler(EulerRot::YXZ);
             let yaw = yaw + delta_yaw;
+            transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, 0.0, 0.0);
 
-            // If the pitch was ±¹⁄₂ π, the camera would look straight up or down.
-            // When the user wants to move the camera back to the horizon, which way should the camera face?
-            // The camera has no way of knowing what direction was "forward" before landing in that extreme position,
-            // so the direction picked will for all intents and purposes be arbitrary.
-            // Another issue is that for mathematical reasons, the yaw will effectively be flipped when the pitch is at the extremes.
-            // To not run into these issues, we clamp the pitch to a safe range.
+            // Pitch UNIQUEMENT sur la caméra enfant
+            let (_, pitch, _) = camera_transform.rotation.to_euler(EulerRot::YXZ);
             const PITCH_LIMIT: f32 = FRAC_PI_2 - 0.01;
             let pitch = (pitch + delta_pitch).clamp(-PITCH_LIMIT, PITCH_LIMIT);
-
-            transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, roll);
+            camera_transform.rotation = Quat::from_euler(EulerRot::YXZ, 0.0, pitch, 0.0);
         }
     }
 }
@@ -131,4 +187,38 @@ fn player_jump(
     if is_grounded {
         velocity.linear.y = JUMP_FORCE;
     }
+}
+
+fn check_fall(mut query: Query<&mut Transform, With<Player>>) {
+    let Ok(mut transform) = query.single_mut() else {
+        return;
+    };
+    let y = transform.translation.y;
+
+    if y < -10.0 {
+        transform.translation = SPAWN_POINT;
+    }
+}
+
+fn spawn_crosshair(mut commands: Commands) {
+    println!("Crosshair est spawn");
+    commands
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            position_type: PositionType::Absolute,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        })
+        .with_children(|parent| {
+            parent.spawn((
+                Node {
+                    width: Val::Px(4.0),
+                    height: Val::Px(4.0),
+                    ..default()
+                },
+                BackgroundColor(Color::WHITE),
+            ));
+        });
 }

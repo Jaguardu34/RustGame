@@ -11,6 +11,7 @@ dependencies = [
  "bevy_voxel_world",
  "block-mesh",
  "noise",
+ "rand 0.10.2",
 ]
 
 [[package]]
