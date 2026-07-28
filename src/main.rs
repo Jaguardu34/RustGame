@@ -1,4 +1,4 @@
-use bevy::{pbr::DefaultOpaqueRendererMethod, prelude::*};
+use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
 pub mod player;
@@ -12,6 +12,9 @@ use crate::player::PlayerPlugin;
 
 pub mod spawn_objects;
 
+pub mod ui;
+use ui::UiPlugin;
+
 #[derive(Resource, Default)]
 pub struct GameState {
     pub mouse_grabbed: bool,
@@ -23,8 +26,7 @@ fn main() {
         .init_resource::<PlayerVar>()
         .add_plugins(DefaultPlugins)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugins(PlayerPlugin)
-        .add_plugins(PlayerInputPlugin)
+        .add_plugins((PlayerPlugin, PlayerInputPlugin, UiPlugin))
         .add_systems(Startup, (setup_lights, setup_scene, setup_player))
         .run();
 }
