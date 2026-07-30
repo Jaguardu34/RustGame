@@ -1,6 +1,6 @@
-use crate::GameState;
-use crate::player::{Player, PlayerCamera, PlayerCameraSensitivity, player_jump};
+use crate::player::{Player, PlayerCamera, PlayerCameraSensitivity};
 use crate::spawn_objects::spawn_object;
+use crate::{FloatingPlatform, GameState};
 
 use bevy::{
     input::mouse::AccumulatedMouseMotion,
@@ -19,10 +19,20 @@ pub struct PlayerInputPlugin;
 
 impl Plugin for PlayerInputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (handle_input, grab_mouse, player_jump, check_fall));
+        app.add_systems(
+            Update,
+            (
+                handle_input,
+                grab_mouse,
+                float_platform,
+                //check_fall,
+            )
+                .chain(),
+        );
     }
 }
 
+//bric broc fn to redo
 fn handle_input(
     gamestate: Res<GameState>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -38,6 +48,10 @@ fn handle_input(
     materials: ResMut<Assets<StandardMaterial>>,
     time: Res<Time>,
 ) {
+    if player_var.free_cam && !keyboard.pressed(KeyCode::KeyK) {
+        return;
+    }
+
     let Ok((mut transform, mut velocity, playercamerasensitivity)) = player_query.single_mut()
     else {
         return;
@@ -144,7 +158,21 @@ fn grab_mouse(
     mouse: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
     mut gamestate: ResMut<GameState>,
+    player_var: Res<PlayerVar>,
+    mut last_free_cam: Local<bool>,
 ) {
+    if *last_free_cam != player_var.free_cam {
+        if player_var.free_cam {
+            cursor_options.visible = true;
+            cursor_options.grab_mode = CursorGrabMode::None;
+        }
+    }
+    *last_free_cam = player_var.free_cam;
+
+    if player_var.free_cam {
+        return;
+    }
+
     if mouse.just_pressed(MouseButton::Left) {
         cursor_options.visible = false;
         cursor_options.grab_mode = CursorGrabMode::Locked;
@@ -158,15 +186,39 @@ fn grab_mouse(
     }
 }
 
-fn check_fall(mut query: Query<&mut Transform, With<Player>>) {
-    let Ok(mut transform) = query.single_mut() else {
+// fn check_fall(mut query: Query<&mut Transform, With<Player>>) {
+//     let Ok(mut transform) = query.single_mut() else {
+//         return;
+//     };
+
+//     let y = transform.translation.y;
+
+//     if y < -10.0 {
+//         transform.translation = SPAWN_POINT;
+//         transform.rotation = Quat::IDENTITY;
+//     }
+// }
+
+fn float_platform(
+    mut platform_query: Query<&mut ExternalForce, With<FloatingPlatform>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut force: Local<f32>,
+) {
+    let Ok(mut external_force) = platform_query.single_mut() else {
         return;
     };
 
-    let y = transform.translation.y;
+    if keyboard.just_pressed(KeyCode::ArrowUp) {
+        *force += 1.0;
+    }
 
-    if y < -10.0 {
-        transform.translation = SPAWN_POINT;
-        transform.rotation = Quat::from_xyzw(0.0, 0.0, 0.0, 0.0);
+    if keyboard.just_pressed(KeyCode::ArrowDown) {
+        *force -= 1.0;
+    }
+
+    external_force.force = Vec3 {
+        x: 0.0,
+        y: *force,
+        z: 0.0,
     }
 }

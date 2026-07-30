@@ -1,11 +1,11 @@
-use bevy::{post_process::bloom::Bloom, prelude::*};
+use bevy::{camera::visibility::RenderLayers, post_process::bloom::Bloom, prelude::*};
 use bevy_rapier3d::prelude::*;
 
 use std::time::Duration;
 
+//tick timer for ui
 #[derive(Resource, Deref, DerefMut)]
 pub struct TickTimer(Timer);
-
 impl Default for TickTimer {
     fn default() -> Self {
         Self(Timer::new(
@@ -14,6 +14,16 @@ impl Default for TickTimer {
         ))
     }
 }
+
+//CONST
+const PLAYER_HEIGHT: f32 = 1.0;
+const PLAYER_RADIUS: f32 = 0.2;
+//valeur capsule debout
+const PLAYER_HALF_LENGTH_STAND: f32 = PLAYER_HEIGHT / 2.0 - PLAYER_RADIUS; // 0.3
+//valeur en crouch
+const PLAYER_HEIGHT_CROUCH: f32 = PLAYER_HEIGHT / 2.0; // 0.5
+//valeur capsule en crouch
+const PLAYER_HALF_LENGTH_CROUCH: f32 = PLAYER_HEIGHT_CROUCH / 2.0 - PLAYER_RADIUS; // 0.05
 
 #[derive(Component, Default)]
 pub struct Player;
@@ -27,6 +37,7 @@ pub struct PlayerFlashLight;
 #[derive(Debug, Component, Deref, DerefMut)]
 pub struct PlayerCameraSensitivity(Vec2);
 
+//usefule player var
 #[derive(Resource)]
 pub struct PlayerVar {
     pub flashlight: bool,
@@ -37,6 +48,7 @@ pub struct PlayerVar {
     pub can_place: bool,
     pub jump_force: f32,
     pub base_speed: f32,
+    pub free_cam: bool,
 }
 
 impl Default for PlayerVar {
@@ -50,12 +62,13 @@ impl Default for PlayerVar {
             can_place: false,
             jump_force: 4.0,
             base_speed: 6.0,
+            free_cam: false,
         } // Custom default value
     }
 }
 
 pub struct PlayerPlugin;
-
+//player plugin
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<TickTimer>().add_systems(
@@ -73,19 +86,38 @@ impl Default for PlayerCameraSensitivity {
 
 const THIRD_PERSON_CAMERA_DISTANCE: f32 = 10.0;
 
-pub fn default_player() -> impl Bundle {
+pub fn default_player(
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) -> impl Bundle {
     (
         Player,
         Transform::from_xyz(0.0, 2.0, 0.0),
         RigidBody::Dynamic,
-        Collider::cuboid(0.4, 0.5, 0.4),
+        Collider::capsule_y(PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0), PLAYER_RADIUS),
         Velocity::default(),
         GravityScale(1.0),
         LockedAxes::ROTATION_LOCKED,
         PlayerCameraSensitivity::default(),
-        ColliderMassProperties::Density(10.0),
+        ActiveEvents::COLLISION_EVENTS,
+        ExternalForce::default(),
+        RenderLayers::layer(1),
+        Sleeping::disabled(),
+        Mesh3d(meshes.add(Capsule3d {
+            radius: PLAYER_RADIUS,
+            half_length: PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0),
+        })),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(1.0, 0.0, 0.0),
+            ..default()
+        })),
         children![(
+            //camera of the player
             Camera3d::default(),
+            Camera {
+                is_active: true,
+                ..default()
+            },
             Transform::from_xyz(0.0, 0.5, 0.0),
             PlayerCamera,
             Projection::from(PerspectiveProjection {
@@ -96,6 +128,7 @@ pub fn default_player() -> impl Bundle {
             Msaa::Off,
             IsDefaultUiCamera,
             children![(
+                //flashlight of the player
                 SpotLight {
                     range: 30.0,
                     shadow_maps_enabled: true,
@@ -111,6 +144,7 @@ pub fn default_player() -> impl Bundle {
     )
 }
 
+//fn to toggle flashlight
 fn update_flashlight(
     mut flashlight_query: Query<&mut SpotLight, With<PlayerFlashLight>>,
     player_var: Res<PlayerVar>,
@@ -126,13 +160,15 @@ fn update_flashlight(
     }
 }
 
+//fn to crouch
 fn crouch(
-    mut player_query: Query<&mut Collider, With<Player>>,
+    mut player_query: Query<(&mut Collider, &mut Mesh3d), With<Player>>,
     mut camera_query: Query<&mut Transform, With<PlayerCamera>>,
     player_var: Res<PlayerVar>,
     time: Res<Time>,
+    mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let Ok(mut collider) = player_query.single_mut() else {
+    let Ok((mut collider, mut meshe)) = player_query.single_mut() else {
         return;
     };
 
@@ -140,26 +176,37 @@ fn crouch(
         return;
     };
 
-    let mut camera_height = camera_transform.translation.y;
+    let Some(capsule) = collider.as_capsule() else {
+        return;
+    };
 
-    let camera_goal = if player_var.crouching { 0.0 } else { 0.5 };
+    //getting the half lenght
+    let mut half_length = capsule.segment().length() / 2.0;
 
-    let mut collider_scale = collider.scale().y;
+    //setting halg lenght
+    let half_length_goal = if player_var.crouching {
+        PLAYER_HALF_LENGTH_CROUCH
+    } else {
+        PLAYER_HALF_LENGTH_STAND
+    };
 
-    let collider_scale_goal = if player_var.crouching { 0.25 } else { 0.5 };
+    half_length = half_length.lerp(half_length_goal, time.delta_secs() * 8.0);
 
-    collider_scale = collider_scale.lerp(collider_scale_goal, time.delta_secs() * 0.8);
+    *collider = Collider::capsule_y(half_length, PLAYER_RADIUS);
+    *meshe = Mesh3d(meshes.add(Capsule3d {
+        radius: PLAYER_RADIUS,
+        half_length,
+    }));
 
-    collider.set_scale(
-        Vec3 {
-            x: 0.4,
-            y: collider_scale,
-            z: 0.4,
-        },
-        8,
-    );
-
-    camera_height = camera_height.lerp(camera_goal, time.delta_secs() * 8.0);
+    let camera_goal = if player_var.crouching {
+        PLAYER_HEIGHT_CROUCH / 2.0 - 0.1
+    } else {
+        PLAYER_HEIGHT / 2.0 - 0.1
+    };
+    let camera_height = camera_transform
+        .translation
+        .y
+        .lerp(camera_goal, time.delta_secs() * 8.0);
 
     camera_transform.translation = Vec3 {
         x: 0.0,
@@ -168,6 +215,7 @@ fn crouch(
     };
 }
 
+//fn to update the useful player var like coords etc
 fn update_player_var(
     mut player_var: ResMut<PlayerVar>,
     player_query: Query<(&Transform, &Velocity), With<Player>>,
@@ -185,6 +233,10 @@ pub fn player_jump(
     player_var: Res<PlayerVar>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
+    if player_var.free_cam && !keyboard.pressed(KeyCode::KeyK) {
+        return;
+    };
+
     let Ok((entity, transform, mut velocity, collider)) = query.single_mut() else {
         return;
     };
@@ -197,9 +249,15 @@ pub fn player_jump(
         return;
     };
 
+    let Some(capsule) = collider.as_capsule() else {
+        return;
+    };
+    let half_height = capsule.height() / 2.0; // ou capsule.segment().length()/2.0 selon la version
+    let radius = capsule.radius();
+
     let ray_origin = transform.translation;
     let ray_dir = Vec3::NEG_Y;
-    let max_distance = collider.scale().y / 2.0;
+    let max_distance = half_height + radius + 0.1;
     let filter = QueryFilter::default().exclude_collider(entity);
 
     let is_grounded = context
