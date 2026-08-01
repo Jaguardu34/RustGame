@@ -1,7 +1,13 @@
-use bevy::{camera::visibility::RenderLayers, post_process::bloom::Bloom, prelude::*};
+use bevy::{
+    camera::{Hdr, visibility::RenderLayers},
+    post_process::bloom::Bloom,
+    prelude::*,
+};
 use bevy_rapier3d::prelude::*;
 
 use std::time::Duration;
+
+use crate::game_var::GameVar;
 
 //tick timer for ui
 #[derive(Resource, Deref, DerefMut)]
@@ -34,10 +40,7 @@ pub struct PlayerCamera;
 #[derive(Component)]
 pub struct PlayerFlashLight;
 
-#[derive(Debug, Component, Deref, DerefMut)]
-pub struct PlayerCameraSensitivity(Vec2);
-
-//usefule player var
+//useful player var
 #[derive(Resource)]
 pub struct PlayerVar {
     pub flashlight: bool,
@@ -48,7 +51,8 @@ pub struct PlayerVar {
     pub can_place: bool,
     pub jump_force: f32,
     pub base_speed: f32,
-    pub free_cam: bool,
+    pub camera_sensitivity: Vec2,
+    pub spawn_point: Vec3,
 }
 
 impl Default for PlayerVar {
@@ -62,7 +66,8 @@ impl Default for PlayerVar {
             can_place: false,
             jump_force: 4.0,
             base_speed: 6.0,
-            free_cam: false,
+            camera_sensitivity: Vec2::new(0.003, 0.002),
+            spawn_point: Vec3::new(0.0, 2.0, 0.0),
         } // Custom default value
     }
 }
@@ -78,13 +83,7 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-impl Default for PlayerCameraSensitivity {
-    fn default() -> Self {
-        Self(Vec2::new(0.003, 0.002))
-    }
-}
-
-const THIRD_PERSON_CAMERA_DISTANCE: f32 = 10.0;
+//const THIRD_PERSON_CAMERA_DISTANCE: f32 = 10.0;
 
 pub fn default_player(
     mut meshes: ResMut<Assets<Mesh>>,
@@ -92,17 +91,16 @@ pub fn default_player(
 ) -> impl Bundle {
     (
         Player,
+        Name::new("Player"),
         Transform::from_xyz(0.0, 2.0, 0.0),
         RigidBody::Dynamic,
         Collider::capsule_y(PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0), PLAYER_RADIUS),
         Velocity::default(),
-        GravityScale(1.0),
         LockedAxes::ROTATION_LOCKED,
-        PlayerCameraSensitivity::default(),
         ActiveEvents::COLLISION_EVENTS,
         ExternalForce::default(),
         RenderLayers::layer(1),
-        Sleeping::disabled(),
+        ColliderMassProperties::Density(2.0),
         Mesh3d(meshes.add(Capsule3d {
             radius: PLAYER_RADIUS,
             half_length: PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0),
@@ -114,8 +112,10 @@ pub fn default_player(
         children![(
             //camera of the player
             Camera3d::default(),
+            Name::new("PlayerCamera"),
             Camera {
                 is_active: true,
+                order: 0,
                 ..default()
             },
             Transform::from_xyz(0.0, 0.5, 0.0),
@@ -125,8 +125,8 @@ pub fn default_player(
                 ..default()
             }),
             Bloom::NATURAL,
+            Hdr,
             Msaa::Off,
-            IsDefaultUiCamera,
             children![(
                 //flashlight of the player
                 SpotLight {
@@ -134,9 +134,10 @@ pub fn default_player(
                     shadow_maps_enabled: true,
                     inner_angle: 0.4,
                     intensity: 1_000_000.0,
-                    outer_angle: 0.6,
+                    outer_angle: 0.8,
                     ..default()
                 },
+                Name::new("PlayerFlashlight"),
                 Transform::from_xyz(0.0, 0.0, 0.0),
                 PlayerFlashLight
             )]
@@ -192,11 +193,15 @@ fn crouch(
 
     half_length = half_length.lerp(half_length_goal, time.delta_secs() * 8.0);
 
-    *collider = Collider::capsule_y(half_length, PLAYER_RADIUS);
-    *meshe = Mesh3d(meshes.add(Capsule3d {
-        radius: PLAYER_RADIUS,
-        half_length,
-    }));
+    if (half_length - half_length_goal).abs() > 0.001
+        || half_length != capsule.segment().length() / 2.0
+    {
+        *collider = Collider::capsule_y(half_length, PLAYER_RADIUS);
+        *meshe = Mesh3d(meshes.add(Capsule3d {
+            radius: PLAYER_RADIUS,
+            half_length,
+        }));
+    }
 
     let camera_goal = if player_var.crouching {
         PLAYER_HEIGHT_CROUCH / 2.0 - 0.1
@@ -230,12 +235,13 @@ fn update_player_var(
 pub fn player_jump(
     rapier_context: ReadRapierContext,
     mut query: Query<(Entity, &Transform, &mut Velocity, &Collider), With<Player>>,
-    player_var: Res<PlayerVar>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    game_var: Res<GameVar>,
+    player_var: Res<PlayerVar>,
 ) {
-    if player_var.free_cam && !keyboard.pressed(KeyCode::KeyK) {
+    if !game_var.mouse_grabbed {
         return;
-    };
+    }
 
     let Ok((entity, transform, mut velocity, collider)) = query.single_mut() else {
         return;
