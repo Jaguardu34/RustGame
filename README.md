@@ -9,13 +9,15 @@ Currently building the editor with **bevy_egui**
 ---
 
 **Crates** Used :   
-`bevy = {version = "0.19.0",  features = ["dynamic_linking", "bevy_dev_tools", "free_camera"] }
+```
+bevy = {version = "0.19.0",  features = ["dynamic_linking", "bevy_dev_tools", "free_camera"] }
 bevy-inspector-egui = "0.37.0"
 bevy_hanabi = "0.19.0"
 bevy_rapier3d = "0.35.0"
 bevy_window = "0.19.0"
 egui_dock = "0.20.1"
-rand = "0.10.2"`
+rand = "0.10.2"
+```
 
 ---
 
