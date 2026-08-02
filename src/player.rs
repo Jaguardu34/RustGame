@@ -3,8 +3,11 @@ use bevy::{
     post_process::bloom::Bloom,
     prelude::*,
 };
-use bevy_rapier3d::prelude::*;
 
+use bevy_inspector_egui::{
+    InspectorOptions, inspector_options::ReflectInspectorOptions, quick::ResourceInspectorPlugin,
+};
+use bevy_rapier3d::prelude::*;
 use std::time::Duration;
 
 use crate::game_var::GameVar;
@@ -41,7 +44,8 @@ pub struct PlayerCamera;
 pub struct PlayerFlashLight;
 
 //useful player var
-#[derive(Resource)]
+#[derive(Resource, Reflect, InspectorOptions)]
+#[reflect(Resource, InspectorOptions)]
 pub struct PlayerVar {
     pub flashlight: bool,
     pub sprinting: bool,
@@ -76,10 +80,13 @@ pub struct PlayerPlugin;
 //player plugin
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<TickTimer>().add_systems(
-            Update,
-            (update_flashlight, crouch, update_player_var, player_jump),
-        );
+        app.add_plugins(ResourceInspectorPlugin::<PlayerVar>::default())
+            .init_resource::<PlayerVar>()
+            .init_resource::<TickTimer>()
+            .add_systems(
+                Update,
+                (update_flashlight, crouch, update_player_var, player_jump),
+            );
     }
 }
 
@@ -124,7 +131,7 @@ pub fn default_player(
                 fov: 90.0_f32.to_radians(),
                 ..default()
             }),
-            Bloom::NATURAL,
+            //Bloom::NATURAL,
             Hdr,
             Msaa::Off,
             children![(

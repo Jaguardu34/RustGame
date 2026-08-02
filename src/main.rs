@@ -29,7 +29,6 @@ use free_camera::FreeCamPlugin;
 fn main() {
     App::new()
         .init_resource::<GameVar>()
-        .init_resource::<PlayerVar>()
         .add_plugins(DefaultPlugins)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(EguiPlugin::default())
@@ -110,19 +109,4 @@ fn setup_player(
     egui_global_settings.auto_create_primary_context = false;
 
     commands.spawn(default_player(meshes, materials));
-
-    commands.spawn((
-        Camera2d,
-        Name::new("UiCamera"),
-        Camera {
-            order: 1,
-            clear_color: ClearColorConfig::None,
-            ..default()
-        },
-        Msaa::Off,
-        RenderLayers::none(),
-        IsDefaultUiCamera,
-        PrimaryEguiContext,
-        Hdr,
-    ));
 }

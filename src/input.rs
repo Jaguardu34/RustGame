@@ -35,6 +35,9 @@ pub fn handle_input(
     mut player_var: ResMut<PlayerVar>,
     mut game_var: ResMut<GameVar>,
 ) {
+    if keyboard.just_pressed(KeyCode::Escape) && game_var.free_cam {
+        game_var.free_cam = false;
+    }
     if !game_var.mouse_grabbed {
         return;
     }
