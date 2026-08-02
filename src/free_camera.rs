@@ -6,10 +6,10 @@ use bevy::{
 };
 
 use crate::{
+    editor::GameViewCam,
     game_var::GameVar,
     player::{Player, PlayerCamera},
     setup_player,
-    ui::GameViewCam,
 };
 
 #[derive(Component)]

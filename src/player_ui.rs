@@ -1,10 +1,5 @@
-use bevy::{
-    camera::{Hdr, Viewport, visibility::RenderLayers},
-    prelude::*,
-};
+use bevy::prelude::*;
 
-use bevy_hanabi::position;
-use bevy_inspector_egui::bevy_egui::PrimaryEguiContext;
 use bevy_rapier3d::{pipeline::QueryFilter, plugin::ReadRapierContext};
 
 use crate::{
@@ -13,10 +8,6 @@ use crate::{
     setup_player,
 };
 use bevy_inspector_egui::bevy_egui::{EguiContext, EguiPrimaryContextPass};
-use bevy_inspector_egui::bevy_inspector;
-
-use bevy_inspector_egui::egui;
-use bevy_window::PrimaryWindow;
 
 #[derive(Component)]
 pub struct DefaultUi;
@@ -26,92 +17,24 @@ pub struct UiPlugin;
 #[derive(Component)]
 pub struct PlayerCrosshair;
 
-#[derive(Resource, Default)]
-pub struct EditorVar {
-    pub mouse_on_viewport: bool,
-}
-
-#[derive(Resource)]
-struct GameViewRect(bevy_inspector_egui::egui::Rect);
-
-#[derive(Component)]
-pub struct GameViewCam;
-
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<EditorVar>()
-            .insert_resource(GameViewRect(egui::Rect::NOTHING))
-            //.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin) // adds default options and `InspectorEguiImpl`s
-            .add_systems(EguiPrimaryContextPass, inspector_ui)
-            .add_systems(Startup, spawn_ui.after(setup_player))
-            .add_systems(Update, (update_ui, can_place))
-            .add_systems(PostUpdate, set_camera_viewport.after(inspector_ui));
+        app.add_systems(Startup, spawn_ui.after(setup_player))
+            .add_systems(Update, (update_ui, can_place));
     }
 }
 
 #[derive(Component)]
 pub struct UICamera;
 
-fn inspector_ui(world: &mut World) {
-    let mut egui_context = world
-        .query_filtered::<&mut EguiContext, With<bevy_inspector_egui::bevy_egui::PrimaryEguiContext>>()
-        .single(world)
-        .expect("EguiContext not found")
-        .clone();
-
-    egui::Window::new("UI").show(egui_context.get_mut(), |ui| {
-        egui::ScrollArea::both().show(ui, |ui| {
-            // equivalent to `WorldInspectorPlugin`
-            bevy_inspector::ui_for_world(world, ui);
-
-            // works with any `Reflect` value, including `Handle`s
-            let mut any_reflect_value: i32 = 5;
-            bevy_inspector::ui_for_value(&mut any_reflect_value, ui, world);
-
-            egui::CollapsingHeader::new("Materials").show(ui, |ui| {
-                bevy_inspector::ui_for_assets::<StandardMaterial>(world, ui);
-            });
-
-            ui.heading("Entities");
-            bevy_inspector::ui_for_entities(world, ui);
-        });
-    });
-    let response = egui::Window::new("GameView")
-        .resizable(true)
-        .default_size([500.0, 200.0])
-        .frame(egui::Frame::NONE)
-        .show(egui_context.get_mut(), |ui| {
-            ui.allocate_space(ui.available_size());
-        });
-
-    if let Some(response) = response {
-        world.resource_mut::<GameViewRect>().0 = response.response.rect;
-        world.resource_mut::<EditorVar>().mouse_on_viewport = response.response.hovered();
-    }
-}
-
 fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<PlayerCamera>>) {
     let Ok(player_camera_entity) = player_camera_query.single() else {
         return;
     };
 
-    commands.spawn((
-        Camera2d,
-        Name::new("UiCamera"),
-        Camera {
-            order: 10,
-            clear_color: ClearColorConfig::None,
-            ..default()
-        },
-        Msaa::Off,
-        RenderLayers::none(),
-        IsDefaultUiCamera,
-        PrimaryEguiContext,
-        Hdr,
-        UICamera,
-    ));
     commands
         .spawn((
+            Name::new("Player_UI"),
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Px(50.0),
@@ -134,6 +57,7 @@ fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<Play
         });
     commands
         .spawn((
+            Name::new("Player_Crosshair"),
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
@@ -155,31 +79,6 @@ fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<Play
                 PlayerCrosshair,
             ));
         });
-}
-
-fn set_camera_viewport(
-    game_view_rect: Res<GameViewRect>,
-    window: Single<&Window, With<PrimaryWindow>>,
-    mut cam_query: Query<&mut Camera, With<GameViewCam>>,
-) {
-    cam_query.iter_mut().for_each(|mut cam| {
-        let scale_factor = window.scale_factor();
-        let pos = game_view_rect.0.left_top().to_vec2() * scale_factor;
-        let size = game_view_rect.0.size() * scale_factor;
-
-        let physical_position = UVec2::new(pos.x.max(0.0) as u32, pos.y.max(0.0) as u32);
-        let physical_size = UVec2::new(size.x.max(1.0) as u32, size.y.max(1.0) as u32);
-
-        let bottom_right = physical_position + physical_size;
-        let window_size = window.physical_size();
-        if bottom_right.x <= window_size.x && bottom_right.y <= window_size.y {
-            cam.viewport = Some(Viewport {
-                physical_position,
-                physical_size,
-                depth: 0.0..1.0,
-            });
-        }
-    });
 }
 
 fn update_ui(

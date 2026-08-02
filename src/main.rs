@@ -1,13 +1,11 @@
-use bevy::camera::Hdr;
-use bevy::camera::visibility::RenderLayers;
 use bevy::render::mesh::Mesh;
 
 use bevy::{camera_controller::free_camera::FreeCameraPlugin, prelude::*};
-use bevy_hanabi::prelude::*;
 use bevy_inspector_egui::bevy_egui::EguiGlobalSettings;
-use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_rapier3d::prelude::*;
 
+pub mod editor;
 pub mod game_var;
 
 pub mod player;
@@ -16,11 +14,13 @@ use player::default_player;
 pub mod input;
 use input::PlayerInputPlugin;
 
+use crate::editor::EditorPlugin;
 use crate::game_var::GameVar;
 use crate::player::PlayerPlugin;
 
-pub mod ui;
-use ui::UiPlugin;
+pub mod player_ui;
+
+use player_ui::UiPlugin;
 
 pub mod free_camera;
 use free_camera::FreeCamPlugin;
@@ -30,9 +30,7 @@ fn main() {
         .init_resource::<GameVar>()
         .add_plugins(DefaultPlugins)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugins(EguiPlugin::default())
-        .add_plugins(WorldInspectorPlugin::new())
-        .add_plugins(HanabiPlugin)
+        .add_plugins(EditorPlugin)
         .add_plugins(FreeCameraPlugin)
         .add_plugins((PlayerPlugin, PlayerInputPlugin, UiPlugin, FreeCamPlugin))
         .add_systems(Startup, (setup_lights, setup_scene, setup_player).chain())

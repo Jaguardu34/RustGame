@@ -9,7 +9,7 @@ use bevy_inspector_egui::{
 use bevy_rapier3d::prelude::*;
 use std::time::Duration;
 
-use crate::{game_var::GameVar, ui::GameViewCam};
+use crate::{editor::GameViewCam, game_var::GameVar};
 
 //tick timer for ui
 #[derive(Resource, Deref, DerefMut)]
@@ -79,8 +79,8 @@ pub struct PlayerPlugin;
 //player plugin
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(ResourceInspectorPlugin::<PlayerVar>::default())
-            .init_resource::<PlayerVar>()
+        app.init_resource::<PlayerVar>()
+            .register_type::<PlayerVar>()
             .init_resource::<TickTimer>()
             .add_systems(
                 Update,
