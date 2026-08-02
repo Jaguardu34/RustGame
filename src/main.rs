@@ -4,14 +4,13 @@ use bevy::render::mesh::Mesh;
 
 use bevy::{camera_controller::free_camera::FreeCameraPlugin, prelude::*};
 use bevy_hanabi::prelude::*;
-use bevy_inspector_egui::bevy_egui::{EguiGlobalSettings, PrimaryEguiContext};
+use bevy_inspector_egui::bevy_egui::EguiGlobalSettings;
 use bevy_inspector_egui::{bevy_egui::EguiPlugin, quick::WorldInspectorPlugin};
 use bevy_rapier3d::prelude::*;
 
 pub mod game_var;
 
 pub mod player;
-use player::PlayerVar;
 use player::default_player;
 
 pub mod input;

@@ -1,6 +1,5 @@
 use bevy::{
     camera::{Hdr, visibility::RenderLayers},
-    post_process::bloom::Bloom,
     prelude::*,
 };
 
@@ -10,7 +9,7 @@ use bevy_inspector_egui::{
 use bevy_rapier3d::prelude::*;
 use std::time::Duration;
 
-use crate::game_var::GameVar;
+use crate::{game_var::GameVar, ui::GameViewCam};
 
 //tick timer for ui
 #[derive(Resource, Deref, DerefMut)]
@@ -134,6 +133,7 @@ pub fn default_player(
             //Bloom::NATURAL,
             Hdr,
             Msaa::Off,
+            GameViewCam,
             children![(
                 //flashlight of the player
                 SpotLight {

@@ -1,8 +1,9 @@
 use bevy::{
-    camera::{Hdr, visibility::RenderLayers},
+    camera::{Hdr, Viewport, visibility::RenderLayers},
     prelude::*,
 };
 
+use bevy_hanabi::position;
 use bevy_inspector_egui::bevy_egui::PrimaryEguiContext;
 use bevy_rapier3d::{pipeline::QueryFilter, plugin::ReadRapierContext};
 
@@ -11,13 +12,11 @@ use crate::{
     player::{Player, PlayerCamera, PlayerVar, TickTimer},
     setup_player,
 };
-use bevy_inspector_egui::bevy_egui::{EguiContext, EguiPlugin, EguiPrimaryContextPass};
+use bevy_inspector_egui::bevy_egui::{EguiContext, EguiPrimaryContextPass};
 use bevy_inspector_egui::bevy_inspector;
 
 use bevy_inspector_egui::egui;
-use bevy_inspector_egui::prelude::*;
 use bevy_window::PrimaryWindow;
-use std::any::TypeId; // instead of a direct `egui` dep
 
 #[derive(Component)]
 pub struct DefaultUi;
@@ -27,13 +26,26 @@ pub struct UiPlugin;
 #[derive(Component)]
 pub struct PlayerCrosshair;
 
+#[derive(Resource, Default)]
+pub struct EditorVar {
+    pub mouse_on_viewport: bool,
+}
+
+#[derive(Resource)]
+struct GameViewRect(bevy_inspector_egui::egui::Rect);
+
+#[derive(Component)]
+pub struct GameViewCam;
+
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app
+        app.init_resource::<EditorVar>()
+            .insert_resource(GameViewRect(egui::Rect::NOTHING))
             //.add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin) // adds default options and `InspectorEguiImpl`s
             .add_systems(EguiPrimaryContextPass, inspector_ui)
             .add_systems(Startup, spawn_ui.after(setup_player))
-            .add_systems(Update, (update_ui, can_place));
+            .add_systems(Update, (update_ui, can_place))
+            .add_systems(PostUpdate, set_camera_viewport.after(inspector_ui));
     }
 }
 
@@ -64,14 +76,18 @@ fn inspector_ui(world: &mut World) {
             bevy_inspector::ui_for_entities(world, ui);
         });
     });
-    egui::Window::new("GameView")
-        .vscroll(false)
+    let response = egui::Window::new("GameView")
         .resizable(true)
-        .default_size([100.0, 500.0])
+        .default_size([500.0, 200.0])
+        .frame(egui::Frame::NONE)
         .show(egui_context.get_mut(), |ui| {
-            ui.label("Label with red background");
             ui.allocate_space(ui.available_size());
         });
+
+    if let Some(response) = response {
+        world.resource_mut::<GameViewRect>().0 = response.response.rect;
+        world.resource_mut::<EditorVar>().mouse_on_viewport = response.response.hovered();
+    }
 }
 
 fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<PlayerCamera>>) {
@@ -117,14 +133,17 @@ fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<Play
             ));
         });
     commands
-        .spawn(Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            position_type: PositionType::Absolute,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            ..default()
-        })
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                position_type: PositionType::Absolute,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            UiTargetCamera(player_camera_entity),
+        ))
         .with_children(|parent| {
             parent.spawn((
                 Node {
@@ -136,6 +155,31 @@ fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<Play
                 PlayerCrosshair,
             ));
         });
+}
+
+fn set_camera_viewport(
+    game_view_rect: Res<GameViewRect>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    mut cam_query: Query<&mut Camera, With<GameViewCam>>,
+) {
+    cam_query.iter_mut().for_each(|mut cam| {
+        let scale_factor = window.scale_factor();
+        let pos = game_view_rect.0.left_top().to_vec2() * scale_factor;
+        let size = game_view_rect.0.size() * scale_factor;
+
+        let physical_position = UVec2::new(pos.x.max(0.0) as u32, pos.y.max(0.0) as u32);
+        let physical_size = UVec2::new(size.x.max(1.0) as u32, size.y.max(1.0) as u32);
+
+        let bottom_right = physical_position + physical_size;
+        let window_size = window.physical_size();
+        if bottom_right.x <= window_size.x && bottom_right.y <= window_size.y {
+            cam.viewport = Some(Viewport {
+                physical_position,
+                physical_size,
+                depth: 0.0..1.0,
+            });
+        }
+    });
 }
 
 fn update_ui(

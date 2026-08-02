@@ -1,5 +1,6 @@
 use crate::game_var::GameVar;
 use crate::player::{Player, PlayerCamera};
+use crate::ui::EditorVar;
 
 use bevy::{
     input::mouse::AccumulatedMouseMotion,
@@ -34,12 +35,14 @@ pub fn handle_input(
     mut player_query: Query<&mut Transform, With<Player>>,
     mut player_var: ResMut<PlayerVar>,
     mut game_var: ResMut<GameVar>,
+    editor_var: Res<EditorVar>,
 ) {
+    if !editor_var.mouse_on_viewport {
+        return;
+    }
+
     if keyboard.just_pressed(KeyCode::Escape) && game_var.free_cam {
         game_var.free_cam = false;
-    }
-    if !game_var.mouse_grabbed {
-        return;
     }
 
     if keyboard.just_pressed(KeyCode::KeyP) {
@@ -69,10 +72,12 @@ fn handle_movement_input(
     mut player_var: ResMut<PlayerVar>,
     mut player_query: Query<(&Transform, &mut Velocity), With<Player>>,
     game_var: Res<GameVar>,
+    editor_var: Res<EditorVar>,
 ) {
-    if !game_var.mouse_grabbed {
+    if game_var.free_cam || !editor_var.mouse_on_viewport {
         return;
     }
+
     let Ok((transform, mut velocity)) = player_query.single_mut() else {
         return;
     };
@@ -160,6 +165,8 @@ fn grab_mouse(
     mut cursor_options: Single<&mut CursorOptions>,
     key: Res<ButtonInput<KeyCode>>,
     mut game_var: ResMut<GameVar>,
+    editor_var: Res<EditorVar>,
+    buttons: Res<ButtonInput<MouseButton>>,
 ) {
     if game_var.free_cam {
         return;
@@ -172,8 +179,11 @@ fn grab_mouse(
         cursor_options.visible = true;
         cursor_options.grab_mode = CursorGrabMode::None;
     }
+    if buttons.just_pressed(MouseButton::Left) && editor_var.mouse_on_viewport {
+        game_var.mouse_grabbed = true;
+    }
 
-    if key.just_pressed(KeyCode::Escape) {
-        game_var.mouse_grabbed = !game_var.mouse_grabbed;
+    if key.just_pressed(KeyCode::Escape) && game_var.mouse_grabbed {
+        game_var.mouse_grabbed = false;
     }
 }

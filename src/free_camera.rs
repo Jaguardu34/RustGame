@@ -1,9 +1,7 @@
 use bevy::{
     camera::{Hdr, visibility::RenderLayers},
     camera_controller::free_camera::FreeCamera,
-    post_process::bloom::Bloom,
     prelude::*,
-    reflect::Is,
     window::{CursorGrabMode, CursorOptions},
 };
 
@@ -11,7 +9,7 @@ use crate::{
     game_var::GameVar,
     player::{Player, PlayerCamera},
     setup_player,
-    ui::UICamera,
+    ui::GameViewCam,
 };
 
 #[derive(Component)]
@@ -41,11 +39,12 @@ pub fn spawn_free_cam(
         FreeCam,
         FreeCamera::default(),
         Camera {
-            is_active: true,
+            is_active: false,
             order: 0,
             ..default()
         },
         Hdr,
+        GameViewCam,
         //Bloom::NATURAL,
         projection.clone(),
         Transform::from_translation(player_cam_transform.translation())
@@ -83,6 +82,7 @@ pub fn toggle_free_cam(
     };
 
     if game_var.free_cam {
+        println!("{:?}", free_cam_camera.viewport);
         free_cam_camera.is_active = true;
         player_camera.is_active = false;
     } else {
