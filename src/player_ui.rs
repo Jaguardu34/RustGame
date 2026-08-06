@@ -3,11 +3,9 @@ use bevy::prelude::*;
 use bevy_rapier3d::{pipeline::QueryFilter, plugin::ReadRapierContext};
 
 use crate::{
-    game_var::GameVar,
     player::{Player, PlayerCamera, PlayerVar, TickTimer},
     setup_player,
 };
-use bevy_inspector_egui::bevy_egui::{EguiContext, EguiPrimaryContextPass};
 
 #[derive(Component)]
 pub struct DefaultUi;
@@ -86,7 +84,6 @@ fn update_ui(
     player_var: Res<PlayerVar>,
     mut timer: ResMut<TickTimer>,
     time: Res<Time>,
-    game_var: Res<GameVar>,
 ) {
     timer.tick(time.delta());
 
@@ -97,22 +94,19 @@ fn update_ui(
     let Ok(mut text) = text_query.single_mut() else {
         return;
     };
-    if !game_var.free_cam {
-        let text_to_show: &str = &String::from(format!(
-            "Sprinting : {}, Crouching : {}\nx: {:.1} y: {:.1} z : {:.1}\nSpeed : {:.1}",
-            player_var.sprinting,
-            player_var.crouching,
-            player_var.coord.x,
-            player_var.coord.y,
-            player_var.coord.z,
-            player_var.speed
-        ));
 
-        text.clear();
-        text.insert_str(0, text_to_show);
-    } else {
-        text.clear();
-    }
+    let text_to_show: &str = &String::from(format!(
+        "Sprinting : {}, Crouching : {}\nx: {:.1} y: {:.1} z : {:.1}\nSpeed : {:.1}",
+        player_var.sprinting,
+        player_var.crouching,
+        player_var.coord.x,
+        player_var.coord.y,
+        player_var.coord.z,
+        player_var.speed
+    ));
+
+    text.clear();
+    text.insert_str(0, text_to_show);
 }
 
 fn can_place(

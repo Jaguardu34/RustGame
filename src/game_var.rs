@@ -1,17 +1,20 @@
 use bevy::prelude::*;
+use bevy_inspector_egui::{InspectorOptions, inspector_options::ReflectInspectorOptions};
 
 //Global GameVar
-#[derive(Resource)]
+#[derive(Resource, Reflect, InspectorOptions)]
+#[reflect(Resource, InspectorOptions)]
 pub struct GameVar {
-    pub free_cam: bool,      //is freecam enabled ?
+    //is freecam enabled ?
     pub mouse_grabbed: bool, //is the mouse grabbed by the game ?
+    pub render_distance: u32,
 }
 
 impl Default for GameVar {
     fn default() -> Self {
         GameVar {
-            free_cam: false,
             mouse_grabbed: false,
+            render_distance: 40,
         }
     }
 }

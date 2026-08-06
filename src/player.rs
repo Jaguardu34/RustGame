@@ -3,9 +3,7 @@ use bevy::{
     prelude::*,
 };
 
-use bevy_inspector_egui::{
-    InspectorOptions, inspector_options::ReflectInspectorOptions, quick::ResourceInspectorPlugin,
-};
+use bevy_inspector_egui::{InspectorOptions, inspector_options::ReflectInspectorOptions};
 use bevy_rapier3d::prelude::*;
 use std::time::Duration;
 

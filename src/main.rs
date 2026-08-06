@@ -2,11 +2,11 @@ use bevy::render::mesh::Mesh;
 
 use bevy::{camera_controller::free_camera::FreeCameraPlugin, prelude::*};
 use bevy_inspector_egui::bevy_egui::EguiGlobalSettings;
-use bevy_inspector_egui::bevy_egui::EguiPlugin;
 use bevy_rapier3d::prelude::*;
 
 pub mod editor;
 pub mod game_var;
+pub mod map_generator;
 
 pub mod player;
 use player::default_player;
@@ -16,6 +16,8 @@ use input::PlayerInputPlugin;
 
 use crate::editor::EditorPlugin;
 use crate::game_var::GameVar;
+
+use crate::load_chunks::ChunkPlugin;
 use crate::player::PlayerPlugin;
 
 pub mod player_ui;
@@ -25,6 +27,12 @@ use player_ui::UiPlugin;
 pub mod free_camera;
 use free_camera::FreeCamPlugin;
 
+pub mod world_mesh;
+
+pub mod chunk;
+
+pub mod load_chunks;
+
 fn main() {
     App::new()
         .init_resource::<GameVar>()
@@ -32,6 +40,7 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(EditorPlugin)
         .add_plugins(FreeCameraPlugin)
+        .add_plugins(ChunkPlugin)
         .add_plugins((PlayerPlugin, PlayerInputPlugin, UiPlugin, FreeCamPlugin))
         .add_systems(Startup, (setup_lights, setup_scene, setup_player).chain())
         .run();

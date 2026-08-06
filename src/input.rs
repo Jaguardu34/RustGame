@@ -34,19 +34,10 @@ pub fn handle_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<&mut Transform, With<Player>>,
     mut player_var: ResMut<PlayerVar>,
-    mut game_var: ResMut<GameVar>,
     editor_state: Res<EditorState>,
 ) {
-    if !editor_state.pointer_in_viewport {
+    if !editor_state.game_playing {
         return;
-    }
-
-    if keyboard.just_pressed(KeyCode::Backspace) && game_var.free_cam {
-        game_var.free_cam = false;
-    }
-
-    if keyboard.just_pressed(KeyCode::KeyP) {
-        game_var.free_cam = !game_var.free_cam;
     }
 
     let Ok(mut transform) = player_query.single_mut() else {
@@ -71,10 +62,10 @@ fn handle_movement_input(
     time: Res<Time>,
     mut player_var: ResMut<PlayerVar>,
     mut player_query: Query<(&Transform, &mut Velocity), With<Player>>,
-    game_var: Res<GameVar>,
+
     editor_state: Res<EditorState>,
 ) {
-    if game_var.free_cam || !editor_state.pointer_in_viewport {
+    if !editor_state.game_playing {
         return;
     }
 
@@ -168,7 +159,7 @@ fn grab_mouse(
     editor_state: Res<EditorState>,
     buttons: Res<ButtonInput<MouseButton>>,
 ) {
-    if game_var.free_cam {
+    if editor_state.free_cam {
         return;
     }
 

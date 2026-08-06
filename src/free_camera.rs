@@ -6,7 +6,7 @@ use bevy::{
 };
 
 use crate::{
-    editor::GameViewCam,
+    editor::{EditorState, GameViewCam},
     game_var::GameVar,
     player::{Player, PlayerCamera},
     setup_player,
@@ -59,20 +59,15 @@ pub fn toggle_free_cam(
         (&mut Camera, &GlobalTransform),
         (With<PlayerCamera>, Without<FreeCam>),
     >,
-    mut player_query: Query<&mut Transform, (With<Player>, Without<FreeCam>)>,
     mut free_cam_query: Query<
         (&mut Camera, &mut Transform),
         (With<FreeCam>, Without<Player>, Without<PlayerCamera>),
     >,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut game_var: ResMut<GameVar>,
+    editor_state: Res<EditorState>,
     mut cursor_options: Single<&mut CursorOptions>,
     mut last_game_var: Local<bool>,
+    mut game_var: ResMut<GameVar>,
 ) {
-    let Ok(mut player_transform) = player_query.single_mut() else {
-        return;
-    };
-
     let Ok((mut player_camera, player_camera_transform)) = player_camera_query.single_mut() else {
         return;
     };
@@ -81,8 +76,7 @@ pub fn toggle_free_cam(
         return;
     };
 
-    if game_var.free_cam {
-        println!("{:?}", free_cam_camera.viewport);
+    if editor_state.free_cam {
         free_cam_camera.is_active = true;
         player_camera.is_active = false;
     } else {
@@ -90,11 +84,8 @@ pub fn toggle_free_cam(
         free_cam_camera.is_active = false;
     }
 
-    if keyboard.just_pressed(KeyCode::Enter) && game_var.free_cam {
-        game_var.free_cam = false;
-        player_transform.translation = transform.translation;
-    } else if *last_game_var != game_var.free_cam {
-        if game_var.free_cam {
+    if *last_game_var != editor_state.free_cam {
+        if editor_state.free_cam {
             game_var.mouse_grabbed = false;
             cursor_options.visible = true;
             cursor_options.grab_mode = CursorGrabMode::None;
@@ -102,5 +93,5 @@ pub fn toggle_free_cam(
             transform.rotation = player_camera_transform.rotation();
         }
     }
-    *last_game_var = game_var.free_cam;
+    *last_game_var = editor_state.free_cam;
 }
