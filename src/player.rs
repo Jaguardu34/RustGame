@@ -3,8 +3,8 @@ use bevy::{
     prelude::*,
 };
 
+use avian3d::prelude::*;
 use bevy_inspector_egui::{InspectorOptions, inspector_options::ReflectInspectorOptions};
-use bevy_rapier3d::prelude::*;
 use std::time::Duration;
 
 use crate::{editor::GameViewCam, game_var::GameVar};
@@ -98,13 +98,9 @@ pub fn default_player(
         Player,
         Name::new("Player"),
         RigidBody::Dynamic,
-        Collider::capsule_y(PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0), PLAYER_RADIUS),
-        Velocity::default(),
+        Collider::capsule(PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0), PLAYER_RADIUS),
         LockedAxes::ROTATION_LOCKED,
-        ActiveEvents::COLLISION_EVENTS,
-        ExternalForce::default(),
         RenderLayers::layer(1),
-        ColliderMassProperties::Density(2.0),
         Mesh3d(meshes.add(Capsule3d {
             radius: PLAYER_RADIUS,
             half_length: PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0),
@@ -183,12 +179,12 @@ fn crouch(
         return;
     };
 
-    let Some(capsule) = collider.as_capsule() else {
+    let Some(capsule) = collider.shape().as_capsule() else {
         return;
     };
 
     //getting the half lenght
-    let mut half_length = capsule.segment().length() / 2.0;
+    let mut half_length = capsule.half_height();
 
     //setting halg lenght
     let half_length_goal = if player_var.crouching {
@@ -199,10 +195,8 @@ fn crouch(
 
     half_length = half_length.lerp(half_length_goal, time.delta_secs() * 8.0);
 
-    if (half_length - half_length_goal).abs() > 0.001
-        || half_length != capsule.segment().length() / 2.0
-    {
-        *collider = Collider::capsule_y(half_length, PLAYER_RADIUS);
+    if (half_length - half_length_goal).abs() > 0.001 || half_length != capsule.half_height() {
+        *collider = Collider::capsule(half_length, PLAYER_RADIUS);
         *meshe = Mesh3d(meshes.add(Capsule3d {
             radius: PLAYER_RADIUS,
             half_length,
@@ -229,18 +223,18 @@ fn crouch(
 //fn to update the useful player var like coords etc
 fn update_player_var(
     mut player_var: ResMut<PlayerVar>,
-    player_query: Query<(&Transform, &Velocity), With<Player>>,
+    player_query: Query<(&Transform, &LinearVelocity), With<Player>>,
 ) {
     let Ok((transform, velocity)) = player_query.single() else {
         return;
     };
-    player_var.speed = velocity.linear.abs().max_element();
+    player_var.speed = velocity.abs().max_element();
     player_var.coord = transform.translation;
 }
 
 pub fn player_jump(
-    rapier_context: ReadRapierContext,
-    mut query: Query<(Entity, &Transform, &mut Velocity, &Collider), With<Player>>,
+    physics_query: SpatialQuery,
+    mut query: Query<(Entity, &Transform, &mut LinearVelocity, &Collider), With<Player>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     game_var: Res<GameVar>,
     player_var: Res<PlayerVar>,
@@ -257,26 +251,22 @@ pub fn player_jump(
         return;
     };
 
-    let Ok(context) = rapier_context.single() else {
-        return;
-    };
-
-    let Some(capsule) = collider.as_capsule() else {
+    let Some(capsule) = collider.shape().as_capsule() else {
         return;
     };
     let half_height = capsule.height() / 2.0; // ou capsule.segment().length()/2.0 selon la version
-    let radius = capsule.radius();
+    let radius = capsule.radius;
 
     let ray_origin = transform.translation;
-    let ray_dir = Vec3::NEG_Y;
+    let ray_dir = Dir3::Y;
     let max_distance = half_height + radius + 0.1;
-    let filter = QueryFilter::default().exclude_collider(entity);
+    let filter = SpatialQueryFilter::default().with_excluded_entities([entity]);
 
-    let is_grounded = context
-        .cast_ray(ray_origin, ray_dir, max_distance, true, filter)
+    let is_grounded = physics_query
+        .cast_ray(ray_origin, ray_dir, max_distance, true, &filter)
         .is_some();
 
     if is_grounded {
-        velocity.linear.y = player_var.jump_force;
+        velocity.y = player_var.jump_force;
     }
 }

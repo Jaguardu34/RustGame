@@ -1,6 +1,5 @@
+use avian3d::spatial_query::{SpatialQuery, SpatialQueryFilter};
 use bevy::prelude::*;
-
-use bevy_rapier3d::{pipeline::QueryFilter, plugin::ReadRapierContext};
 
 use crate::{
     player::{Player, PlayerCamera, PlayerVar, TickTimer},
@@ -110,7 +109,7 @@ fn update_ui(
 }
 
 fn can_place(
-    rapier_context: ReadRapierContext,
+    spatial_query: SpatialQuery,
     player_query: Query<Entity, With<Player>>,
     camera_query: Query<&GlobalTransform, With<PlayerCamera>>,
     mut crosshair_query: Query<&mut BackgroundColor, With<PlayerCrosshair>>,
@@ -123,21 +122,17 @@ fn can_place(
         return;
     };
 
-    let Ok(context) = rapier_context.single() else {
-        return;
-    };
-
     let Ok(mut background_color) = crosshair_query.single_mut() else {
         return;
     };
 
     let ray_origin = camera_transform.translation();
-    let ray_direction = camera_transform.forward().as_vec3();
+    let ray_direction = camera_transform.forward();
     let ray_max_distance = 2.0;
-    let filter = QueryFilter::default().exclude_collider(player_entity);
+    let filter = SpatialQueryFilter::default().with_excluded_entities([player_entity]);
 
-    let can_pose = context
-        .cast_ray(ray_origin, ray_direction, ray_max_distance, true, filter)
+    let can_pose = spatial_query
+        .cast_ray(ray_origin, ray_direction, ray_max_distance, true, &filter)
         .is_some();
 
     if can_pose {

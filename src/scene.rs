@@ -1,3 +1,4 @@
+use avian3d::prelude::*;
 use bevy::prelude::*;
 use bevy_inspector_egui::bevy_egui::EguiGlobalSettings;
 
@@ -52,5 +53,12 @@ fn setup_meshes(
         MeshMaterial3d(materials.add(Color::srgb(0.8, 0.3, 0.3))),
         Transform::from_xyz(0.0, 1.0, 0.0),
         TransformGizmoFocus,
+    ));
+
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(10.0, 1.0, 10.0))),
+        MeshMaterial3d(materials.add(Color::WHITE)),
+        RigidBody::Static,
+        Collider::cuboid(10.0, 1.0, 10.0),
     ));
 }

@@ -2,12 +2,12 @@ use crate::editor::EditorState;
 use crate::game_var::GameVar;
 use crate::player::{Player, PlayerCamera};
 
+use avian3d::prelude::*;
 use bevy::{
     input::mouse::AccumulatedMouseMotion,
     prelude::*,
     window::{CursorGrabMode, CursorOptions},
 };
-use bevy_rapier3d::prelude::*;
 
 use crate::player::PlayerVar;
 
@@ -66,7 +66,7 @@ fn handle_movement_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     mut player_var: ResMut<PlayerVar>,
-    mut player_query: Query<(&Transform, &mut Velocity), With<Player>>,
+    mut player_query: Query<(&Transform, &mut LinearVelocity), With<Player>>,
 
     editor_state: Res<EditorState>,
 ) {
@@ -105,10 +105,10 @@ fn handle_movement_input(
     };
 
     let target_velocity = Vec3::new(direction.x * goal_speed, 0.0, direction.z * goal_speed);
-    let current = Vec3::new(velocity.linear.x, 0.0, velocity.linear.z);
+    let current = Vec3::new(velocity.x, 0.0, velocity.z);
     let new_vel = current.lerp(target_velocity, time.delta_secs() * 4.0);
-    velocity.linear.x = new_vel.x;
-    velocity.linear.z = new_vel.z;
+    velocity.x = new_vel.x;
+    velocity.z = new_vel.z;
 
     if keyboard.pressed(KeyCode::ShiftLeft) && !player_var.crouching {
         player_var.sprinting = true;

@@ -1,5 +1,5 @@
+use avian3d::prelude::*;
 use bevy::{camera_controller::free_camera::FreeCameraPlugin, prelude::*};
-use bevy_rapier3d::prelude::*;
 
 pub mod editor;
 pub mod game_var;
@@ -26,7 +26,7 @@ fn main() {
     App::new()
         .init_resource::<GameVar>()
         .add_plugins(DefaultPlugins)
-        .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugins(PhysicsPlugins::default())
         .add_plugins(EditorPlugin)
         .add_plugins(FreeCameraPlugin)
         .add_plugins(TransformGizmoPlugin)

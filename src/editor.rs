@@ -1,3 +1,4 @@
+use avian3d::spatial_query::{SpatialQuery, SpatialQueryFilter};
 use bevy::camera::Hdr;
 use bevy::camera::visibility::RenderLayers;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
@@ -9,11 +10,10 @@ use bevy_inspector_egui::bevy_egui::{EguiPlugin, EguiPrimaryContextPass, Primary
 use bevy_inspector_egui::egui;
 use bevy_inspector_egui::egui::LayerId;
 use bevy_inspector_egui::{DefaultInspectorConfigPlugin, bevy_inspector};
-use bevy_rapier3d::pipeline::QueryFilter;
-use bevy_rapier3d::plugin::ReadRapierContext;
 use bevy_window::PrimaryWindow;
 use egui_dock::egui::UiBuilder;
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
+use rand::random;
 
 use crate::free_camera::FreeCam;
 use crate::game_var::GameVar;
@@ -334,9 +334,9 @@ fn pick_object_in_viewport(
     windows: Query<&Window, With<PrimaryWindow>>,
     editor_state: Res<EditorState>,
     cam_query: Query<(&Camera, &GlobalTransform), With<FreeCam>>,
-    rapier_context: ReadRapierContext,
-    mut selected_items: ResMut<SelectedItems>,
 
+    mut selected_items: ResMut<SelectedItems>,
+    spatial_query: SpatialQuery,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     if !mouse.just_pressed(MouseButton::Left)
@@ -360,22 +360,18 @@ fn pick_object_in_viewport(
         return;
     };
 
-    let Ok(rapier_context) = rapier_context.single() else {
-        return;
-    };
-
-    if let Some((entity, _toi)) = rapier_context.cast_ray(
+    if let Some(ray_hit_data) = spatial_query.cast_ray(
         ray.origin,
-        *ray.direction,
+        *&ray.direction,
         f32::MAX,
         true,
-        QueryFilter::default(),
+        &SpatialQueryFilter::default(),
     ) {
         if keyboard.pressed(KeyCode::ControlLeft) {
-            selected_items.0.add(entity);
+            selected_items.0.add(ray_hit_data.entity);
         } else {
             selected_items.0.clear();
-            selected_items.0.add(entity);
+            selected_items.0.add(ray_hit_data.entity);
         }
     } else {
         selected_items.0.clear();
