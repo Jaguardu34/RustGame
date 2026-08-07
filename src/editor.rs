@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use bevy::camera::Hdr;
 use bevy::camera::visibility::RenderLayers;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
@@ -19,7 +17,6 @@ use egui_dock::{DockArea, DockState, NodeIndex, Style};
 
 use crate::free_camera::FreeCam;
 use crate::game_var::GameVar;
-use crate::load_chunks::{ChunkMap, MapGen, MapParams, RegenerateMapEvent, clear_chunk_cache};
 use crate::player::PlayerVar;
 use crate::player_ui::UICamera;
 
@@ -32,10 +29,22 @@ impl Plugin for EditorPlugin {
             .add_plugins(FrameTimeDiagnosticsPlugin::default())
             .insert_resource(EditorState::new())
             .init_resource::<SelectedItems>()
-            .add_systems(Update, (draw_gizmo, pick_object_in_viewport, pause_app))
-            .add_systems(Startup, (spawn_ui_cam, update_gizmo_parameters))
-            .add_systems(EguiPrimaryContextPass, show_ui_system)
-            .add_systems(PostUpdate, set_camera_viewport.after(show_ui_system));
+            .add_systems(Update, check_editor_state_change)
+            .add_systems(Update, pause_app.run_if(check_if_in_editor))
+            //everything relative to the custom gizmo
+            //.add_systems(Update, (draw_gizmo, pick_object_in_viewport))
+            // .add_systems(Startup, update_gizmo_parameters)
+            .add_systems(Startup, spawn_ui_cam)
+            .add_systems(
+                EguiPrimaryContextPass,
+                show_ui_system.run_if(check_if_in_editor),
+            )
+            .add_systems(
+                PostUpdate,
+                set_camera_viewport
+                    .after(show_ui_system)
+                    .run_if(check_if_in_editor),
+            );
     }
 }
 
@@ -51,7 +60,6 @@ enum WindowType {
     SelectedEntitieInspector,
     GameResourceInspector,
     GameManager,
-    MapManager,
 }
 
 //global states de l'editor
@@ -61,7 +69,6 @@ pub struct EditorState {
     viewport_rect: egui_dock::egui::Rect,
     pub pointer_in_viewport: bool,
     pub game_playing: bool,
-    pub free_cam: bool,
 }
 
 impl EditorState {
@@ -82,11 +89,8 @@ impl EditorState {
             vec![WindowType::GameResourceInspector],
         );
 
-        let [_game_resource_inspector, game_manager] =
+        let [_game_resource_inspector, _game_manager] =
             tree.split_below(game_resource_inspector, 0.5, vec![WindowType::GameManager]);
-
-        let [_game_manager, _map_manager] =
-            tree.split_below(game_manager, 0.5, vec![WindowType::MapManager]);
 
         Self {
             state,
@@ -96,7 +100,6 @@ impl EditorState {
             ),
             pointer_in_viewport: false,
             game_playing: false,
-            free_cam: true,
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, world: &mut World) {
@@ -105,7 +108,6 @@ impl EditorState {
             viewport_rect: &mut self.viewport_rect,
             pointer_in_viewport: &mut self.pointer_in_viewport,
             game_playing: &mut self.game_playing,
-            free_cam: &mut self.free_cam,
         };
 
         DockArea::new(&mut self.state)
@@ -119,7 +121,7 @@ struct TabViewer<'a> {
     viewport_rect: &'a mut egui::Rect,
     pointer_in_viewport: &'a mut bool,
     game_playing: &'a mut bool,
-    free_cam: &'a mut bool,
+    //free_cam: &'a mut bool,
 }
 
 //tab egui
@@ -163,10 +165,6 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                 bevy_inspector::ui_for_resource::<GameVar>(self.world, ui);
             }
             WindowType::GameManager => {
-                ui.style_mut().text_styles.insert(
-                    egui::TextStyle::Button,
-                    egui::FontId::new(24.0, egui::epaint::FontFamily::Proportional),
-                );
                 let button_label = if !*self.game_playing {
                     String::from("Play")
                 } else {
@@ -191,58 +189,10 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                 {
                     ui.label(String::from(format!("{}", value)));
                 }
-            }
-            WindowType::MapManager => {
-                let mut map_params = self.world.get_resource_mut::<MapParams>().unwrap();
 
-                let mut changed = false;
-
-                ui.label("Seed");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut map_params.seed).speed(1))
-                    .changed();
-                ui.label("Scale");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut map_params.scale).speed(0.001))
-                    .changed();
-                ui.label("Lacunarity");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut map_params.lacunarity).speed(0.001))
-                    .changed();
-                ui.label("Persistance");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut map_params.persistance).speed(0.001))
-                    .changed();
-                ui.label("Octaves");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut map_params.octaves).speed(1))
-                    .changed();
-                ui.label("Height Mult");
-                changed |= ui
-                    .add(egui::DragValue::new(&mut map_params.height_mult).speed(1))
-                    .changed();
-
-                if changed {
-                    let (seed, scale, lacunarity, persistance, octaves) = (
-                        map_params.seed,
-                        map_params.scale,
-                        map_params.lacunarity,
-                        map_params.persistance,
-                        map_params.octaves,
-                    );
-
-                    drop(map_params);
-
-                    clear_chunk_cache(self.world);
-
-                    let mut map_gen = self.world.get_resource_mut::<MapGen>().unwrap();
-                    map_gen
-                        .0
-                        .regenerate(seed, scale, lacunarity, persistance, octaves);
-                    drop(map_gen);
-
-                    self.world.write_message(RegenerateMapEvent);
-                }
+                if ui.button("Leave Editor").clicked() {
+                    self.world.get_resource_mut::<GameVar>().unwrap().in_editor = false;
+                };
             }
         }
 
@@ -342,7 +292,7 @@ fn draw_gizmo(
     selected_items: Res<SelectedItems>,
     editor_state: Res<EditorState>,
 ) {
-    if !editor_state.free_cam {
+    if editor_state.game_playing {
         return;
     }
     for entity in selected_items.0.iter() {
@@ -391,7 +341,7 @@ fn pick_object_in_viewport(
 ) {
     if !mouse.just_pressed(MouseButton::Left)
         || !editor_state.pointer_in_viewport
-        || !editor_state.free_cam
+        || editor_state.game_playing
     {
         return;
     }
@@ -434,10 +384,36 @@ fn pick_object_in_viewport(
 
 fn pause_app(mut virtual_time: ResMut<Time<Virtual>>, mut editor_state: ResMut<EditorState>) {
     if editor_state.game_playing {
-        editor_state.free_cam = false;
         virtual_time.unpause();
     } else {
-        editor_state.free_cam = true;
         virtual_time.pause();
     }
+}
+
+fn check_if_in_editor(game_var: Res<GameVar>) -> bool {
+    game_var.in_editor
+}
+
+fn check_editor_state_change(
+    mut virtual_time: ResMut<Time<Virtual>>,
+    mut editor_state: ResMut<EditorState>,
+    mut cam_query: Query<&mut Camera, With<GameViewCam>>,
+    game_var: Res<GameVar>,
+    mut last_state: Local<bool>,
+) {
+    if !game_var.in_editor {
+        editor_state.game_playing = true;
+        virtual_time.unpause();
+        editor_state.game_playing = true;
+        editor_state.pointer_in_viewport = true;
+
+        //cam in fullscreen
+        cam_query.iter_mut().for_each(|mut cam| {
+            cam.viewport = None;
+        });
+    }
+    if *last_state != game_var.in_editor && game_var.in_editor {
+        editor_state.game_playing = false;
+    }
+    *last_state = game_var.in_editor;
 }

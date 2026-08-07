@@ -92,11 +92,11 @@ impl Plugin for PlayerPlugin {
 pub fn default_player(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    pos: Vec3,
 ) -> impl Bundle {
     (
         Player,
         Name::new("Player"),
-        Transform::from_xyz(0.0, 2.0, 0.0),
         RigidBody::Dynamic,
         Collider::capsule_y(PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0), PLAYER_RADIUS),
         Velocity::default(),
@@ -113,6 +113,7 @@ pub fn default_player(
             base_color: Color::srgb(1.0, 0.0, 0.0),
             ..default()
         })),
+        Transform::from_translation(pos),
         children![(
             //camera of the player
             Camera3d::default(),

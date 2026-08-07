@@ -8,6 +8,7 @@ pub struct GameVar {
     //is freecam enabled ?
     pub mouse_grabbed: bool, //is the mouse grabbed by the game ?
     pub render_distance: u32,
+    pub in_editor: bool,
 }
 
 impl Default for GameVar {
@@ -15,6 +16,7 @@ impl Default for GameVar {
         GameVar {
             mouse_grabbed: false,
             render_distance: 40,
+            in_editor: false,
         }
     }
 }

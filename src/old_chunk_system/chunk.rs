@@ -49,12 +49,7 @@ impl Chunk {
         }
     }
 
-    pub fn spawn(
-        &mut self,
-        commands: &mut Commands,
-        meshes: &mut ResMut<Assets<Mesh>>,
-        materials: &mut ResMut<Assets<StandardMaterial>>,
-    ) {
+    pub fn spawn(&mut self, commands: &mut Commands, meshes: &mut ResMut<Assets<Mesh>>) {
         if self.entity.is_some() {
             return;
         }

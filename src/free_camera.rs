@@ -9,7 +9,7 @@ use crate::{
     editor::{EditorState, GameViewCam},
     game_var::GameVar,
     player::{Player, PlayerCamera},
-    setup_player,
+    scene::setup_player,
 };
 
 #[derive(Component)]
@@ -45,6 +45,7 @@ pub fn spawn_free_cam(
         },
         Hdr,
         GameViewCam,
+        TransformGizmoCamera,
         //Bloom::NATURAL,
         projection.clone(),
         Transform::from_translation(player_cam_transform.translation())
@@ -76,7 +77,7 @@ pub fn toggle_free_cam(
         return;
     };
 
-    if editor_state.free_cam {
+    if !editor_state.game_playing {
         free_cam_camera.is_active = true;
         player_camera.is_active = false;
     } else {
@@ -84,8 +85,8 @@ pub fn toggle_free_cam(
         free_cam_camera.is_active = false;
     }
 
-    if *last_game_var != editor_state.free_cam {
-        if editor_state.free_cam {
+    if *last_game_var != editor_state.game_playing {
+        if !editor_state.game_playing {
             game_var.mouse_grabbed = false;
             cursor_options.visible = true;
             cursor_options.grab_mode = CursorGrabMode::None;
@@ -93,5 +94,5 @@ pub fn toggle_free_cam(
             transform.rotation = player_camera_transform.rotation();
         }
     }
-    *last_game_var = editor_state.free_cam;
+    *last_game_var = editor_state.game_playing;
 }

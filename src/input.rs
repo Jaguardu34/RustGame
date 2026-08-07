@@ -35,7 +35,12 @@ pub fn handle_input(
     mut player_query: Query<&mut Transform, With<Player>>,
     mut player_var: ResMut<PlayerVar>,
     editor_state: Res<EditorState>,
+    mut game_var: ResMut<GameVar>,
 ) {
+    if keyboard.just_pressed(KeyCode::F12) {
+        game_var.in_editor = !game_var.in_editor;
+    }
+
     if !editor_state.game_playing {
         return;
     }
@@ -44,7 +49,7 @@ pub fn handle_input(
         return;
     };
 
-    if keyboard.pressed(KeyCode::KeyR) {
+    if keyboard.just_pressed(KeyCode::KeyR) {
         transform.translation = player_var.spawn_point;
     }
 
@@ -159,7 +164,7 @@ fn grab_mouse(
     editor_state: Res<EditorState>,
     buttons: Res<ButtonInput<MouseButton>>,
 ) {
-    if editor_state.free_cam {
+    if !editor_state.game_playing {
         return;
     }
 
