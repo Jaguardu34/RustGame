@@ -12,12 +12,14 @@ Currently building the editor with **bevy_egui**
 **Crates** Used :   
 ```
 [dependencies]
+avian3d = "0.7.0"
 bevy = {version = "0.19.0",  features = ["dynamic_linking", "bevy_dev_tools", "free_camera"] }
 bevy-inspector-egui = "0.37.0"
 bevy_hanabi = "0.19.0"
-bevy_rapier3d = "0.35.0"
 bevy_window = "0.19.0"
 egui_dock = "=0.19.1"
+ndarray = "0.17.2"
+noise = "0.9.0"
 rand = "0.10.2"
 ```
 
