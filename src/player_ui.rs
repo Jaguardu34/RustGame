@@ -1,5 +1,8 @@
 use avian3d::spatial_query::{SpatialQuery, SpatialQueryFilter};
-use bevy::prelude::*;
+use bevy::{
+    diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
+    prelude::*,
+};
 
 use crate::{
     player::{Player, PlayerCamera, PlayerVar, TickTimer},
@@ -83,6 +86,7 @@ fn update_ui(
     player_var: Res<PlayerVar>,
     mut timer: ResMut<TickTimer>,
     time: Res<Time>,
+    diagnostics: Res<DiagnosticsStore>,
 ) {
     timer.tick(time.delta());
 
@@ -94,14 +98,24 @@ fn update_ui(
         return;
     };
 
+    let fps_value = if let Some(value) = diagnostics
+        .get(&FrameTimeDiagnosticsPlugin::FPS)
+        .and_then(|fps| fps.smoothed())
+    {
+        format!("{:.1}", value)
+    } else {
+        String::from("Error fetching FPS")
+    };
+
     let text_to_show: &str = &String::from(format!(
-        "Sprinting : {}, Crouching : {}\nx: {:.1} y: {:.1} z : {:.1}\nSpeed : {:.1}",
+        "Sprinting : {}, Crouching : {}\nx: {:.1} y: {:.1} z : {:.1}\nSpeed : {:.1}\nFps : {}",
         player_var.sprinting,
         player_var.crouching,
         player_var.coord.x,
         player_var.coord.y,
         player_var.coord.z,
-        player_var.speed
+        player_var.speed,
+        fps_value
     ));
 
     text.clear();

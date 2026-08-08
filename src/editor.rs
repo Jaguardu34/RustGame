@@ -2,8 +2,7 @@ use avian3d::spatial_query::{SpatialQuery, SpatialQueryFilter};
 use bevy::camera::Hdr;
 use bevy::camera::visibility::RenderLayers;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
-use bevy::ecs::entity::EntityHashSet;
-use bevy::ecs::relationship::RelationshipSourceCollection;
+
 use bevy::{camera::Viewport, prelude::*};
 use bevy_inspector_egui::bevy_egui::{EguiContext, EguiGlobalSettings};
 use bevy_inspector_egui::bevy_egui::{EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
@@ -13,7 +12,6 @@ use bevy_inspector_egui::{DefaultInspectorConfigPlugin, bevy_inspector};
 use bevy_window::PrimaryWindow;
 use egui_dock::egui::UiBuilder;
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use rand::random;
 
 use crate::free_camera::FreeCam;
 use crate::game_var::GameVar;
@@ -28,12 +26,19 @@ impl Plugin for EditorPlugin {
             .add_plugins(DefaultInspectorConfigPlugin)
             .add_plugins(FrameTimeDiagnosticsPlugin::default())
             .insert_resource(EditorState::new())
-            .init_resource::<SelectedItems>()
             .add_systems(Update, check_editor_state_change)
-            .add_systems(Update, pause_app.run_if(check_if_in_editor))
-            //everything relative to the custom gizmo
-            //.add_systems(Update, (draw_gizmo, pick_object_in_viewport))
-            // .add_systems(Startup, update_gizmo_parameters)
+            .add_systems(
+                Update,
+                (update_transform_gizmo_settings, pause_app).run_if(check_if_in_editor),
+            )
+            //custom gizmo
+            .add_systems(
+                Update,
+                (draw_gizmo, pick_object_in_viewport)
+                    .run_if(check_if_in_editor)
+                    .after(set_camera_viewport),
+            )
+            .add_systems(Startup, update_gizmo_parameters)
             .add_systems(Startup, spawn_ui_cam)
             .add_systems(
                 EguiPrimaryContextPass,
@@ -47,9 +52,6 @@ impl Plugin for EditorPlugin {
             );
     }
 }
-
-#[derive(Resource, Default)]
-pub struct SelectedItems(pub EntityHashSet);
 
 //enregistrer le type de chaque fenetre
 #[derive(Debug)]
@@ -69,6 +71,7 @@ pub struct EditorState {
     viewport_rect: egui_dock::egui::Rect,
     pub pointer_in_viewport: bool,
     pub game_playing: bool,
+    pub pause_time: bool,
 }
 
 impl EditorState {
@@ -100,6 +103,7 @@ impl EditorState {
             ),
             pointer_in_viewport: false,
             game_playing: false,
+            pause_time: false,
         }
     }
     fn ui(&mut self, ui: &mut egui::Ui, world: &mut World) {
@@ -108,6 +112,7 @@ impl EditorState {
             viewport_rect: &mut self.viewport_rect,
             pointer_in_viewport: &mut self.pointer_in_viewport,
             game_playing: &mut self.game_playing,
+            pause_time: &mut self.pause_time,
         };
 
         DockArea::new(&mut self.state)
@@ -121,6 +126,7 @@ struct TabViewer<'a> {
     viewport_rect: &'a mut egui::Rect,
     pointer_in_viewport: &'a mut bool,
     game_playing: &'a mut bool,
+    pause_time: &'a mut bool,
     //free_cam: &'a mut bool,
 }
 
@@ -145,26 +151,24 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                 bevy_inspector::ui_for_resource::<PlayerVar>(self.world, ui);
             }
             WindowType::SelectedEntitieInspector => {
-                let selected: Vec<Entity> = self
+                let mut query = self
                     .world
-                    .get_resource::<SelectedItems>()
-                    .map(|s| s.0.iter().copied().collect())
-                    .unwrap_or_default();
+                    .query_filtered::<Entity, With<TransformGizmoFocus>>();
 
-                if selected.len() == 1 {
-                    egui::ScrollArea::both().show(ui, |ui| {
-                        bevy_inspector::ui_for_entity(self.world, selected[0], ui);
-                    });
-                } else if selected.is_empty() {
+                let Ok(entity) = query.single(self.world) else {
                     ui.label("Aucune entité sélectionnée");
-                } else {
-                    ui.label("Plusieurs entités sélectionnées");
-                }
+                    return;
+                };
+
+                egui::ScrollArea::both().show(ui, |ui| {
+                    bevy_inspector::ui_for_entity(self.world, entity, ui);
+                });
             }
             WindowType::GameResourceInspector => {
                 bevy_inspector::ui_for_resource::<GameVar>(self.world, ui);
             }
             WindowType::GameManager => {
+                ui.label("Game");
                 let button_label = if !*self.game_playing {
                     String::from("Play")
                 } else {
@@ -192,6 +196,17 @@ impl egui_dock::TabViewer for TabViewer<'_> {
 
                 if ui.button("Leave Editor").clicked() {
                     self.world.get_resource_mut::<GameVar>().unwrap().in_editor = false;
+                };
+
+                ui.label("Physics Time");
+                let button_label = if *self.pause_time {
+                    String::from("Play")
+                } else {
+                    String::from("Pause")
+                };
+
+                if ui.button(button_label).clicked() {
+                    *self.pause_time = !*self.pause_time;
                 };
             }
         }
@@ -289,14 +304,14 @@ fn update_gizmo_parameters(mut config_store: ResMut<GizmoConfigStore>) {
 fn draw_gizmo(
     objects_query: Query<&GlobalTransform>,
     mut gizmos: Gizmos,
-    selected_items: Res<SelectedItems>,
+    selected_items: Query<Entity, With<TransformGizmoFocus>>,
     editor_state: Res<EditorState>,
 ) {
     if editor_state.game_playing {
         return;
     }
-    for entity in selected_items.0.iter() {
-        if let Ok(global_transform) = objects_query.get(*entity) {
+    for entity in selected_items.iter() {
+        if let Ok(global_transform) = objects_query.get(entity) {
             gizmos.arrow(
                 global_transform.translation(),
                 Vec3 {
@@ -334,10 +349,10 @@ fn pick_object_in_viewport(
     windows: Query<&Window, With<PrimaryWindow>>,
     editor_state: Res<EditorState>,
     cam_query: Query<(&Camera, &GlobalTransform), With<FreeCam>>,
-
-    mut selected_items: ResMut<SelectedItems>,
+    existing: Query<Entity, With<TransformGizmoFocus>>,
+    mut commands: Commands,
     spatial_query: SpatialQuery,
-    keyboard: Res<ButtonInput<KeyCode>>,
+    mut last_selected: Local<Option<Entity>>,
 ) {
     if !mouse.just_pressed(MouseButton::Left)
         || !editor_state.pointer_in_viewport
@@ -362,27 +377,35 @@ fn pick_object_in_viewport(
 
     if let Some(ray_hit_data) = spatial_query.cast_ray(
         ray.origin,
-        *&ray.direction,
+        ray.direction,
         f32::MAX,
         true,
         &SpatialQueryFilter::default(),
     ) {
-        if keyboard.pressed(KeyCode::ControlLeft) {
-            selected_items.0.add(ray_hit_data.entity);
-        } else {
-            selected_items.0.clear();
-            selected_items.0.add(ray_hit_data.entity);
+        if *last_selected != Some(ray_hit_data.entity) {
+            for e in &existing {
+                commands.entity(e).remove::<TransformGizmoFocus>();
+            }
+
+            commands
+                .entity(ray_hit_data.entity)
+                .insert(TransformGizmoFocus);
+            *last_selected = Some(ray_hit_data.entity)
         }
     } else {
-        selected_items.0.clear();
+        println!("MeshPicking rien touché");
+        for e in &existing {
+            commands.entity(e).remove::<TransformGizmoFocus>();
+        }
+        *last_selected = None;
     }
 }
 
-fn pause_app(mut virtual_time: ResMut<Time<Virtual>>, mut editor_state: ResMut<EditorState>) {
-    if editor_state.game_playing {
-        virtual_time.unpause();
-    } else {
+fn pause_app(mut virtual_time: ResMut<Time<Virtual>>, editor_state: ResMut<EditorState>) {
+    if editor_state.pause_time {
         virtual_time.pause();
+    } else {
+        virtual_time.unpause();
     }
 }
 
@@ -402,6 +425,7 @@ fn check_editor_state_change(
         virtual_time.unpause();
         editor_state.game_playing = true;
         editor_state.pointer_in_viewport = true;
+        editor_state.pause_time = false;
 
         //cam in fullscreen
         cam_query.iter_mut().for_each(|mut cam| {
@@ -412,4 +436,8 @@ fn check_editor_state_change(
         editor_state.game_playing = false;
     }
     *last_state = game_var.in_editor;
+}
+
+fn update_transform_gizmo_settings(mut settings: ResMut<TransformGizmoSettings>) {
+    settings.mode = TransformGizmoMode::Translate;
 }

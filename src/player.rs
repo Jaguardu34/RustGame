@@ -7,7 +7,9 @@ use avian3d::prelude::*;
 use bevy_inspector_egui::{InspectorOptions, inspector_options::ReflectInspectorOptions};
 use std::time::Duration;
 
-use crate::{editor::GameViewCam, game_var::GameVar};
+use crate::{
+    character_controller::CharacterControllerBundle, editor::GameViewCam, game_var::GameVar,
+};
 
 //tick timer for ui
 #[derive(Resource, Deref, DerefMut)]
@@ -80,10 +82,7 @@ impl Plugin for PlayerPlugin {
         app.init_resource::<PlayerVar>()
             .register_type::<PlayerVar>()
             .init_resource::<TickTimer>()
-            .add_systems(
-                Update,
-                (update_flashlight, crouch, update_player_var, player_jump),
-            );
+            .add_systems(Update, (update_flashlight, crouch, update_player_var));
     }
 }
 
@@ -97,9 +96,13 @@ pub fn default_player(
     (
         Player,
         Name::new("Player"),
-        RigidBody::Dynamic,
-        Collider::capsule(PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0), PLAYER_RADIUS),
-        LockedAxes::ROTATION_LOCKED,
+        CharacterControllerBundle::new(Collider::capsule(
+            PLAYER_RADIUS,
+            PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0),
+        ))
+        .with_movement(30.0, 0.92, 4.0, 30f32.to_radians()),
+        Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
+        Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
         RenderLayers::layer(1),
         Mesh3d(meshes.add(Capsule3d {
             radius: PLAYER_RADIUS,
@@ -125,6 +128,7 @@ pub fn default_player(
                 fov: 90.0_f32.to_radians(),
                 ..default()
             }),
+
             //Bloom::NATURAL,
             Hdr,
             Msaa::Off,
@@ -254,7 +258,7 @@ pub fn player_jump(
     let Some(capsule) = collider.shape().as_capsule() else {
         return;
     };
-    let half_height = capsule.height() / 2.0; // ou capsule.segment().length()/2.0 selon la version
+    let half_height = capsule.half_height(); // ou capsule.segment().length()/2.0 selon la version
     let radius = capsule.radius;
 
     let ray_origin = transform.translation;
@@ -268,5 +272,7 @@ pub fn player_jump(
 
     if is_grounded {
         velocity.y = player_var.jump_force;
+    } else {
+        println!("Player pas au sol")
     }
 }

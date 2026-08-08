@@ -23,7 +23,7 @@ impl Plugin for PlayerInputPlugin {
                 handle_input,
                 grab_mouse,
                 handle_mouse_input,
-                handle_movement_input,
+                //handle_movement_input,
             ),
         );
     }

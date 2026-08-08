@@ -7,6 +7,7 @@ pub mod input;
 pub mod player;
 use input::PlayerInputPlugin;
 
+use crate::character_controller::CharacterControllerPlugin;
 use crate::editor::EditorPlugin;
 use crate::game_var::GameVar;
 
@@ -22,6 +23,8 @@ use free_camera::FreeCamPlugin;
 
 pub mod scene;
 
+pub mod character_controller;
+
 fn main() {
     App::new()
         .init_resource::<GameVar>()
@@ -31,6 +34,7 @@ fn main() {
         .add_plugins(FreeCameraPlugin)
         .add_plugins(TransformGizmoPlugin)
         .add_plugins(ScenePlugin)
+        .add_plugins(CharacterControllerPlugin)
         //.add_plugins(ChunkPlugin)
         .add_plugins((PlayerPlugin, PlayerInputPlugin, UiPlugin, FreeCamPlugin))
         .run();

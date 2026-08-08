@@ -46,6 +46,7 @@ pub fn spawn_free_cam(
         Hdr,
         GameViewCam,
         TransformGizmoCamera,
+        MeshPickingCamera,
         //Bloom::NATURAL,
         projection.clone(),
         Transform::from_translation(player_cam_transform.translation())

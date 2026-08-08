@@ -51,8 +51,9 @@ fn setup_meshes(
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
         MeshMaterial3d(materials.add(Color::srgb(0.8, 0.3, 0.3))),
-        Transform::from_xyz(0.0, 1.0, 0.0),
-        TransformGizmoFocus,
+        Transform::from_xyz(0.0, 2.0, 0.0),
+        RigidBody::Dynamic,
+        Collider::cuboid(1.0, 1.0, 1.0),
     ));
 
     commands.spawn((
@@ -60,5 +61,13 @@ fn setup_meshes(
         MeshMaterial3d(materials.add(Color::WHITE)),
         RigidBody::Static,
         Collider::cuboid(10.0, 1.0, 10.0),
+    ));
+
+    commands.spawn((
+        Mesh3d(meshes.add(Capsule3d::new(0.2, 0.2))),
+        MeshMaterial3d(materials.add(Color::srgb(0.0, 1.0, 0.0))),
+        RigidBody::Dynamic,
+        Collider::capsule(0.2, 0.2),
+        Transform::from_xyz(2.0, 2.0, 2.0),
     ));
 }
