@@ -28,14 +28,20 @@ pub mod character_controller;
 fn main() {
     App::new()
         .init_resource::<GameVar>()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(PhysicsPlugins::default())
-        .add_plugins(EditorPlugin)
-        .add_plugins(FreeCameraPlugin)
-        .add_plugins(TransformGizmoPlugin)
+        .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
+        //for debugging physics
+        .add_plugins(PhysicsDebugPlugin)
+        // Overwrite default debug rendering configuration (optional)
+        .insert_gizmo_config(
+            PhysicsGizmos {
+                aabb_color: Some(Color::WHITE),
+                ..default()
+            },
+            GizmoConfig::default(),
+        )
+        .add_plugins((EditorPlugin, FreeCameraPlugin, TransformGizmoPlugin))
         .add_plugins(ScenePlugin)
         .add_plugins(CharacterControllerPlugin)
-        //.add_plugins(ChunkPlugin)
         .add_plugins((PlayerPlugin, PlayerInputPlugin, UiPlugin, FreeCamPlugin))
         .run();
 }

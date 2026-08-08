@@ -9,6 +9,7 @@ pub struct GameVar {
     pub mouse_grabbed: bool, //is the mouse grabbed by the game ?
     pub render_distance: u32,
     pub in_editor: bool,
+    pub hitbox_shown: bool,
 }
 
 impl Default for GameVar {
@@ -17,6 +18,7 @@ impl Default for GameVar {
             mouse_grabbed: false,
             render_distance: 40,
             in_editor: false,
+            hitbox_shown: false,
         }
     }
 }

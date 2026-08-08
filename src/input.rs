@@ -23,7 +23,7 @@ impl Plugin for PlayerInputPlugin {
                 handle_input,
                 grab_mouse,
                 handle_mouse_input,
-                //handle_movement_input,
+                toggle_physics_gizmos, //handle_movement_input,
             ),
         );
     }
@@ -39,6 +39,10 @@ pub fn handle_input(
 ) {
     if keyboard.just_pressed(KeyCode::F12) {
         game_var.in_editor = !game_var.in_editor;
+    }
+
+    if keyboard.just_pressed(KeyCode::KeyG) && keyboard.pressed(KeyCode::F3) {
+        game_var.hitbox_shown = !game_var.hitbox_shown
     }
 
     if !editor_state.game_playing {
@@ -181,5 +185,12 @@ fn grab_mouse(
 
     if key.just_pressed(KeyCode::Escape) && game_var.mouse_grabbed {
         game_var.mouse_grabbed = false;
+    }
+}
+
+fn toggle_physics_gizmos(mut store: ResMut<GizmoConfigStore>, game_var: Res<GameVar>) {
+    if game_var.is_changed() {
+        let (config, _) = store.config_mut::<PhysicsGizmos>();
+        config.enabled = game_var.hitbox_shown;
     }
 }

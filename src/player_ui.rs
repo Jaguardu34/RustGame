@@ -1,4 +1,7 @@
-use avian3d::spatial_query::{SpatialQuery, SpatialQueryFilter};
+use avian3d::{
+    collision::collider::Collider,
+    spatial_query::{SpatialQuery, SpatialQueryFilter},
+};
 use bevy::{
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     prelude::*,
@@ -87,6 +90,7 @@ fn update_ui(
     mut timer: ResMut<TickTimer>,
     time: Res<Time>,
     diagnostics: Res<DiagnosticsStore>,
+    physic_object_query: Query<&Collider>,
 ) {
     timer.tick(time.delta());
 
@@ -107,15 +111,18 @@ fn update_ui(
         String::from("Error fetching FPS")
     };
 
+    let count = physic_object_query.iter().len();
+
     let text_to_show: &str = &String::from(format!(
-        "Sprinting : {}, Crouching : {}\nx: {:.1} y: {:.1} z : {:.1}\nSpeed : {:.1}\nFps : {}",
+        "Sprinting : {}, Crouching : {}\nx: {:.1} y: {:.1} z : {:.1}\nSpeed : {:.1}\nFps : {}\nPhysics objects : {}",
         player_var.sprinting,
         player_var.crouching,
         player_var.coord.x,
         player_var.coord.y,
         player_var.coord.z,
         player_var.speed,
-        fps_value
+        fps_value,
+        count
     ));
 
     text.clear();

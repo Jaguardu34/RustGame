@@ -82,7 +82,7 @@ impl Plugin for PlayerPlugin {
         app.init_resource::<PlayerVar>()
             .register_type::<PlayerVar>()
             .init_resource::<TickTimer>()
-            .add_systems(Update, (update_flashlight, crouch, update_player_var));
+            .add_systems(Update, (update_flashlight, update_player_var));
     }
 }
 
@@ -103,6 +103,7 @@ pub fn default_player(
         .with_movement(30.0, 0.92, 4.0, 30f32.to_radians()),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
+        Mass(80.0),
         RenderLayers::layer(1),
         Mesh3d(meshes.add(Capsule3d {
             radius: PLAYER_RADIUS,
@@ -128,7 +129,6 @@ pub fn default_player(
                 fov: 90.0_f32.to_radians(),
                 ..default()
             }),
-
             //Bloom::NATURAL,
             Hdr,
             Msaa::Off,

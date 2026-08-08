@@ -251,14 +251,18 @@ fn movement(
             }
         }
     }
-
 }
 
 /// Slows down movement in the XZ plane.
-fn apply_movement_damping(mut query: Query<(&MovementDampingFactor, &mut LinearVelocity)>) {
+fn apply_movement_damping(
+    time: Res<Time>,
+    mut query: Query<(&MovementDampingFactor, &mut LinearVelocity)>,
+) {
+    let delta_time = time.delta_secs();
     for (damping_factor, mut linear_velocity) in &mut query {
-        // We could use `LinearDamping`, but we don't want to dampen movement along the Y axis
-        linear_velocity.x *= damping_factor.0;
-        linear_velocity.z *= damping_factor.0;
+        let factor = damping_factor.0.powf(delta_time * 60.0);
+
+        linear_velocity.x *= factor;
+        linear_velocity.z *= factor;
     }
 }
