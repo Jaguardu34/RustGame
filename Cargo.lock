@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "RustCraft"
+name = "RustGame"
 version = "0.1.0"
 dependencies = [
  "avian3d",
