@@ -3,7 +3,10 @@ use bevy::prelude::*;
 use bevy_inspector_egui::bevy_egui::EguiGlobalSettings;
 use rand::random_range;
 
-use crate::{pick_object::PlayerPickable, player::default_player};
+use crate::{
+    pick_object::PlayerPickable,
+    player::{PlayerCamera, default_player},
+};
 
 pub struct ScenePlugin;
 
@@ -83,7 +86,8 @@ fn spawn_object(
     if keyboard.pressed(KeyCode::KeyB) {
         commands.spawn((
             WorldAssetRoot(
-                asset_server.load(GltfAssetLabel::Scene(0).from_asset("fantasy_prop/Stool.gltf")),
+                asset_server
+                    .load(GltfAssetLabel::Scene(0).from_asset("fantasy_prop/Bottle_1.gltf")),
             ),
             Transform::from_xyz(random_range(-10.0..-5.0), 4., random_range(-10.0..-5.0)),
             ColliderConstructorHierarchy::new(ColliderConstructor::ConvexHullFromMesh),
