@@ -25,6 +25,9 @@ pub mod scene;
 
 pub mod character_controller;
 
+pub mod pick_object;
+use pick_object::PlayerPickUpPlugin;
+
 fn main() {
     App::new()
         .init_resource::<GameVar>()
@@ -42,6 +45,12 @@ fn main() {
         .add_plugins((EditorPlugin, FreeCameraPlugin, TransformGizmoPlugin))
         .add_plugins(ScenePlugin)
         .add_plugins(CharacterControllerPlugin)
-        .add_plugins((PlayerPlugin, PlayerInputPlugin, UiPlugin, FreeCamPlugin))
+        .add_plugins((
+            PlayerPlugin,
+            PlayerInputPlugin,
+            PlayerPickUpPlugin,
+            UiPlugin,
+            FreeCamPlugin,
+        ))
         .run();
 }

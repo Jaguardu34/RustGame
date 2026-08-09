@@ -96,18 +96,15 @@ pub fn default_player(
     (
         Player,
         Name::new("Player"),
-        CharacterControllerBundle::new(Collider::capsule(
-            PLAYER_RADIUS,
-            PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0),
-        ))
-        .with_movement(30.0, 0.92, 4.0, 30f32.to_radians()),
+        CharacterControllerBundle::new(Collider::capsule(PLAYER_RADIUS, PLAYER_HALF_LENGTH_STAND))
+            .with_movement(30.0, 0.92, 4.0, 30f32.to_radians()),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
         Mass(80.0),
         RenderLayers::layer(1),
         Mesh3d(meshes.add(Capsule3d {
             radius: PLAYER_RADIUS,
-            half_length: PLAYER_HEIGHT / 2.0 - (PLAYER_RADIUS * 2.0),
+            half_length: PLAYER_HALF_LENGTH_STAND,
         })),
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: Color::srgb(1.0, 0.0, 0.0),
@@ -167,63 +164,6 @@ fn update_flashlight(
     }
 }
 
-//fn to crouch
-fn crouch(
-    mut player_query: Query<(&mut Collider, &mut Mesh3d), With<Player>>,
-    mut camera_query: Query<&mut Transform, With<PlayerCamera>>,
-    player_var: Res<PlayerVar>,
-    time: Res<Time>,
-    mut meshes: ResMut<Assets<Mesh>>,
-) {
-    let Ok((mut collider, mut meshe)) = player_query.single_mut() else {
-        return;
-    };
-
-    let Ok(mut camera_transform) = camera_query.single_mut() else {
-        return;
-    };
-
-    let Some(capsule) = collider.shape().as_capsule() else {
-        return;
-    };
-
-    //getting the half lenght
-    let mut half_length = capsule.half_height();
-
-    //setting halg lenght
-    let half_length_goal = if player_var.crouching {
-        PLAYER_HALF_LENGTH_CROUCH
-    } else {
-        PLAYER_HALF_LENGTH_STAND
-    };
-
-    half_length = half_length.lerp(half_length_goal, time.delta_secs() * 8.0);
-
-    if (half_length - half_length_goal).abs() > 0.001 || half_length != capsule.half_height() {
-        *collider = Collider::capsule(half_length, PLAYER_RADIUS);
-        *meshe = Mesh3d(meshes.add(Capsule3d {
-            radius: PLAYER_RADIUS,
-            half_length,
-        }));
-    }
-
-    let camera_goal = if player_var.crouching {
-        PLAYER_HEIGHT_CROUCH / 2.0 - 0.1
-    } else {
-        PLAYER_HEIGHT / 2.0 - 0.1
-    };
-    let camera_height = camera_transform
-        .translation
-        .y
-        .lerp(camera_goal, time.delta_secs() * 8.0);
-
-    camera_transform.translation = Vec3 {
-        x: 0.0,
-        y: camera_height,
-        z: 0.0,
-    };
-}
-
 //fn to update the useful player var like coords etc
 fn update_player_var(
     mut player_var: ResMut<PlayerVar>,
@@ -234,45 +174,4 @@ fn update_player_var(
     };
     player_var.speed = velocity.abs().max_element();
     player_var.coord = transform.translation;
-}
-
-pub fn player_jump(
-    physics_query: SpatialQuery,
-    mut query: Query<(Entity, &Transform, &mut LinearVelocity, &Collider), With<Player>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    game_var: Res<GameVar>,
-    player_var: Res<PlayerVar>,
-) {
-    if !game_var.mouse_grabbed {
-        return;
-    }
-
-    let Ok((entity, transform, mut velocity, collider)) = query.single_mut() else {
-        return;
-    };
-
-    if !keyboard.pressed(KeyCode::Space) {
-        return;
-    };
-
-    let Some(capsule) = collider.shape().as_capsule() else {
-        return;
-    };
-    let half_height = capsule.half_height(); // ou capsule.segment().length()/2.0 selon la version
-    let radius = capsule.radius;
-
-    let ray_origin = transform.translation;
-    let ray_dir = Dir3::Y;
-    let max_distance = half_height + radius + 0.1;
-    let filter = SpatialQueryFilter::default().with_excluded_entities([entity]);
-
-    let is_grounded = physics_query
-        .cast_ray(ray_origin, ray_dir, max_distance, true, &filter)
-        .is_some();
-
-    if is_grounded {
-        velocity.y = player_var.jump_force;
-    } else {
-        println!("Player pas au sol")
-    }
 }

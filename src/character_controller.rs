@@ -3,7 +3,7 @@ use core::f32::consts::PI;
 use avian3d::prelude::*;
 use bevy::{ecs::query::Has, prelude::*};
 
-use crate::{editor::EditorState, game_var, player::Player};
+use crate::{editor::EditorState, player::Player};
 
 pub struct CharacterControllerPlugin;
 

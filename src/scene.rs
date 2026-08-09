@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy_inspector_egui::bevy_egui::EguiGlobalSettings;
 use rand::random_range;
 
-use crate::player::default_player;
+use crate::{pick_object::PlayerPickable, player::default_player};
 
 pub struct ScenePlugin;
 
@@ -71,6 +71,7 @@ fn setup_meshes(
         RigidBody::Dynamic,
         Collider::capsule(0.2, 0.2),
         Transform::from_xyz(2.0, 2.0, 2.0),
+        PlayerPickable,
     ));
 }
 
@@ -88,6 +89,7 @@ fn spawn_object(
             ColliderConstructorHierarchy::new(ColliderConstructor::ConvexHullFromMesh),
             RigidBody::Dynamic,
             ColliderDensity(0.8),
+            PlayerPickable,
         ));
     }
 }

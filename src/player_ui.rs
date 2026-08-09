@@ -1,36 +1,36 @@
-use avian3d::{
-    collision::collider::Collider,
-    spatial_query::{SpatialQuery, SpatialQueryFilter},
-};
+use avian3d::collision::collider::Collider;
 use bevy::{
     diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin},
     prelude::*,
 };
 
 use crate::{
-    player::{Player, PlayerCamera, PlayerVar, TickTimer},
+    pick_object::CanPick,
+    player::{PlayerCamera, PlayerVar, TickTimer},
     scene::setup_player,
 };
 
 #[derive(Component)]
 pub struct DefaultUi;
-
-pub struct UiPlugin;
-
+#[derive(Component)]
+pub struct UICamera;
 #[derive(Component)]
 pub struct PlayerCrosshair;
+
+pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_ui.after(setup_player))
-            .add_systems(Update, (update_ui, can_place));
+            .add_systems(Update, update_ui);
     }
 }
 
-#[derive(Component)]
-pub struct UICamera;
-
-fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<PlayerCamera>>) {
+fn spawn_ui(
+    mut commands: Commands,
+    player_camera_query: Query<Entity, With<PlayerCamera>>,
+    asset_server: Res<AssetServer>,
+) {
     let Ok(player_camera_entity) = player_camera_query.single() else {
         return;
     };
@@ -40,7 +40,7 @@ fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<Play
             Name::new("Player_UI"),
             Node {
                 width: Val::Percent(100.0),
-                height: Val::Px(50.0),
+                height: Val::Percent(100.0),
                 position_type: PositionType::Absolute,
                 top: Val::Px(10.0),
                 ..Default::default()
@@ -73,12 +73,13 @@ fn spawn_ui(mut commands: Commands, player_camera_query: Query<Entity, With<Play
         ))
         .with_children(|parent| {
             parent.spawn((
+                ImageNode::new(asset_server.load("cursor_pack/PNG/Basic/Default/line_cross.png")),
+                // Child Node control `ImageNode` size
                 Node {
-                    width: Val::Px(4.0),
-                    height: Val::Px(4.0),
+                    width: px(11.),
+                    height: px(11.),
                     ..default()
                 },
-                BackgroundColor(Color::WHITE),
                 PlayerCrosshair,
             ));
         });
@@ -91,6 +92,9 @@ fn update_ui(
     time: Res<Time>,
     diagnostics: Res<DiagnosticsStore>,
     physic_object_query: Query<&Collider>,
+    mut crosshair_query: Query<&mut ImageNode, With<PlayerCrosshair>>,
+    can_pickup: Res<CanPick>,
+    asset_server: Res<AssetServer>,
 ) {
     timer.tick(time.delta());
 
@@ -99,6 +103,10 @@ fn update_ui(
     }
 
     let Ok(mut text) = text_query.single_mut() else {
+        return;
+    };
+
+    let Ok(mut crosshair) = crosshair_query.single_mut() else {
         return;
     };
 
@@ -127,38 +135,16 @@ fn update_ui(
 
     text.clear();
     text.insert_str(0, text_to_show);
-}
 
-fn can_place(
-    spatial_query: SpatialQuery,
-    player_query: Query<Entity, With<Player>>,
-    camera_query: Query<&GlobalTransform, With<PlayerCamera>>,
-    mut crosshair_query: Query<&mut BackgroundColor, With<PlayerCrosshair>>,
-) {
-    let Ok(player_entity) = player_query.single() else {
-        return;
-    };
-
-    let Ok(camera_transform) = camera_query.single() else {
-        return;
-    };
-
-    let Ok(mut background_color) = crosshair_query.single_mut() else {
-        return;
-    };
-
-    let ray_origin = camera_transform.translation();
-    let ray_direction = camera_transform.forward();
-    let ray_max_distance = 2.0;
-    let filter = SpatialQueryFilter::default().with_excluded_entities([player_entity]);
-
-    let can_pose = spatial_query
-        .cast_ray(ray_origin, ray_direction, ray_max_distance, true, &filter)
-        .is_some();
-
-    if can_pose {
-        background_color.0 = Color::srgb(1.0, 0.0, 0.0);
-    } else {
-        background_color.0 = Color::WHITE;
+    if can_pickup.is_changed() {
+        if can_pickup.0 {
+            let crosshair_image: Handle<Image> =
+                asset_server.load("cursor_pack/PNG/Basic/Default/hand_open.png");
+            crosshair.image = crosshair_image;
+        } else {
+            let crosshair_image: Handle<Image> =
+                asset_server.load("cursor_pack/PNG/Basic/Default/line_cross.png");
+            crosshair.image = crosshair_image;
+        }
     }
 }
