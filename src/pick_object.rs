@@ -11,8 +11,19 @@ pub struct PlayerPickUpPlugin;
 #[derive(Resource, Default)]
 pub struct CanPick(pub bool);
 
-#[derive(Resource, Default)]
-pub struct ObjectPicked(Option<Entity>);
+#[derive(Resource)]
+pub struct ObjectPicked {
+    entity: Option<Entity>,
+    distance: f32,
+}
+impl Default for ObjectPicked {
+    fn default() -> Self {
+        Self {
+            entity: None,
+            distance: 1.0,
+        }
+    }
+}
 
 impl Plugin for PlayerPickUpPlugin {
     fn build(&self, app: &mut App) {
@@ -23,7 +34,7 @@ impl Plugin for PlayerPickUpPlugin {
 }
 
 const FORCE: f32 = 10.0;
-const DISTANCE: f32 = 1.0;
+const PICK_DISTANCE: f32 = 3.0;
 
 fn update_can_pick(
     spatial_query: SpatialQuery,
@@ -34,6 +45,7 @@ fn update_can_pick(
     parents: Query<&ChildOf>,
     mut object_picked: ResMut<ObjectPicked>,
     mouse: Res<ButtonInput<MouseButton>>,
+    keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     let Ok(cam_transform) = player_cam_query.single() else {
         return;
@@ -43,24 +55,39 @@ fn update_can_pick(
     };
 
     if mouse.just_released(MouseButton::Left) {
-        object_picked.0 = None;
+        object_picked.entity = None;
     }
-    if object_picked.0.is_some() {
+    if object_picked.entity.is_some() {
+        if keyboard.pressed(KeyCode::KeyN) {
+            object_picked.distance -= 0.05;
+        } else if keyboard.pressed(KeyCode::KeyH) {
+            object_picked.distance += 0.05;
+        }
+        object_picked.distance = object_picked.distance.clamp(0.5, 2.0);
         return;
     }
 
     let origin = cam_transform.translation();
     let direction = cam_transform.forward();
     let filter = SpatialQueryFilter::default().with_excluded_entities([player_entity]);
-    let hit = spatial_query.cast_ray_predicate(origin, direction, 4.0, true, &filter, &|entity| {
-        find_pickable_ancestor(entity, &pickable_query, &parents).is_some()
-    });
+
+    let hit = spatial_query.cast_ray_predicate(
+        origin,
+        direction,
+        PICK_DISTANCE,
+        true,
+        &filter,
+        &|entity| find_pickable_ancestor(entity, &pickable_query, &parents).is_some(),
+    );
 
     can_pick.0 = hit.is_some();
 
     if let Some(hit_data) = hit {
         if mouse.just_pressed(MouseButton::Left) {
-            object_picked.0 = find_pickable_ancestor(hit_data.entity, &pickable_query, &parents);
+            object_picked.distance = hit_data.distance.clamp(0.5, 2.0);
+
+            object_picked.entity =
+                find_pickable_ancestor(hit_data.entity, &pickable_query, &parents);
         }
     }
 }
@@ -90,10 +117,11 @@ fn pickup_object(
     let Ok(cam_transform) = player_camera_query.single() else {
         return;
     };
-    let Some(entity) = object_picked.0 else {
+    let Some(entity) = object_picked.entity else {
         return;
     };
-    let hand_pos = cam_transform.translation() + cam_transform.forward().as_vec3() * DISTANCE;
+    let hand_pos =
+        cam_transform.translation() + cam_transform.forward().as_vec3() * object_picked.distance;
     let Ok((mut velocity, mut angular_velocity, transform)) = transform_query.get_mut(entity)
     else {
         return;

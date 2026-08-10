@@ -147,7 +147,7 @@ fn keyboard_input(
         movement_writer.write(MovementAction::Move(direction));
     }
 
-    if keyboard_input.just_pressed(KeyCode::Space) {
+    if keyboard_input.pressed(KeyCode::Space) {
         movement_writer.write(MovementAction::Jump);
     }
 }
@@ -162,7 +162,7 @@ fn gamepad_input(mut movement_writer: MessageWriter<MovementAction>, gamepads: Q
             movement_writer.write(MovementAction::Move(Vec2::new(x, y).clamp_length_max(1.0)));
         }
 
-        if gamepad.just_pressed(GamepadButton::South) {
+        if gamepad.pressed(GamepadButton::South) {
             movement_writer.write(MovementAction::Jump);
         }
     }
