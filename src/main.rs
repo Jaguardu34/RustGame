@@ -28,6 +28,8 @@ pub mod character_controller;
 pub mod pick_object;
 use pick_object::PlayerPickUpPlugin;
 
+pub mod water;
+
 fn main() {
     App::new()
         .init_resource::<GameVar>()

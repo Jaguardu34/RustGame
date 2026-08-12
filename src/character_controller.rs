@@ -28,6 +28,7 @@ impl Plugin for CharacterControllerPlugin {
 pub enum MovementAction {
     Move(Vec2),
     Jump,
+    Crouch(bool),
 }
 
 /// A marker component indicating that an entity is using a character controller.
@@ -63,7 +64,7 @@ pub struct MaxSlopeAngle(f32);
 pub struct CharacterControllerBundle {
     character_controller: CharacterController,
     body: RigidBody,
-    collider: Collider,
+    pub collider: Collider,
     ground_caster: ShapeCaster,
     locked_axes: LockedAxes,
     movement: MovementBundle,
@@ -133,7 +134,12 @@ impl CharacterControllerBundle {
 fn keyboard_input(
     mut movement_writer: MessageWriter<MovementAction>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
+    editor_state: Res<EditorState>,
 ) {
+    if !editor_state.game_playing && !keyboard_input.pressed(KeyCode::KeyP) {
+        return;
+    }
+
     let up = keyboard_input.any_pressed([KeyCode::KeyW, KeyCode::ArrowUp]);
     let down = keyboard_input.any_pressed([KeyCode::KeyS, KeyCode::ArrowDown]);
     let left = keyboard_input.any_pressed([KeyCode::KeyA, KeyCode::ArrowLeft]);
@@ -149,6 +155,12 @@ fn keyboard_input(
 
     if keyboard_input.pressed(KeyCode::Space) {
         movement_writer.write(MovementAction::Jump);
+    }
+
+    if keyboard_input.pressed(KeyCode::KeyC) {
+        movement_writer.write(MovementAction::Crouch(true));
+    } else {
+        movement_writer.write(MovementAction::Crouch(false));
     }
 }
 
@@ -205,12 +217,10 @@ fn movement(
         &mut LinearVelocity,
         Has<Grounded>,
     )>,
-    player_query: Query<&Transform, With<Player>>,
-    editor_state: Res<EditorState>,
+    mut player_query: Query<(&Transform, &mut Collider), With<Player>>,
+
+    keyboard_input: Res<ButtonInput<KeyCode>>,
 ) {
-    if !editor_state.game_playing {
-        return;
-    }
     // Precision is adjusted so that the example works with
     // both the `f32` and `f64` features. Otherwise you don't need this.
     let delta_time = time.delta_secs();
@@ -221,7 +231,7 @@ fn movement(
         {
             match event {
                 MovementAction::Move(direction) => {
-                    let Ok(transform) = player_query.single() else {
+                    let Ok((transform, _collider)) = player_query.single() else {
                         return;
                     };
 
@@ -240,12 +250,42 @@ fn movement(
                     }
 
                     let dir_final = dir_final.normalize_or_zero();
-                    linear_velocity.x += dir_final.x * movement_acceleration.0 * delta_time;
-                    linear_velocity.z += dir_final.z * movement_acceleration.0 * delta_time;
+                    let speed = if keyboard_input.pressed(KeyCode::ShiftLeft) {
+                        movement_acceleration.0 * 2.0
+                    } else {
+                        movement_acceleration.0
+                    };
+                    linear_velocity.x += dir_final.x * speed * delta_time;
+                    linear_velocity.z += dir_final.z * speed * delta_time;
                 }
                 MovementAction::Jump => {
                     if is_grounded {
                         linear_velocity.y = jump_impulse.0;
+                    }
+                }
+                MovementAction::Crouch(crouch) => {
+                    let Ok((_transform, mut collider)) = player_query.single_mut() else {
+                        return;
+                    };
+
+                    if *crouch {
+                        collider.set_scale(
+                            Vec3 {
+                                x: 1.0,
+                                y: 0.5,
+                                z: 1.0,
+                            },
+                            10,
+                        );
+                    } else {
+                        collider.set_scale(
+                            Vec3 {
+                                x: 1.0,
+                                y: 1.0,
+                                z: 1.0,
+                            },
+                            10,
+                        );
                     }
                 }
             }

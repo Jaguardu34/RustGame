@@ -3,6 +3,7 @@ use bevy::camera::Hdr;
 use bevy::camera::visibility::RenderLayers;
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 
+use bevy::post_process::bloom::Bloom;
 use bevy::{camera::Viewport, prelude::*};
 use bevy_inspector_egui::bevy_egui::{EguiContext, EguiGlobalSettings};
 use bevy_inspector_egui::bevy_egui::{EguiPlugin, EguiPrimaryContextPass, PrimaryEguiContext};
@@ -82,7 +83,7 @@ impl EditorState {
         let [game, inspector] =
             tree.split_left(NodeIndex::root(), 0.2, vec![WindowType::Inspector]);
         let [_inspector, _resource_inspector] =
-            tree.split_below(inspector, 0.8, vec![WindowType::PlayerResourceInspector]);
+            tree.split_below(inspector, 0.5, vec![WindowType::PlayerResourceInspector]);
 
         let [_game, selected_entity_inspector] =
             tree.split_right(game, 0.8, vec![WindowType::SelectedEntitieInspector]);
@@ -191,7 +192,7 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                     .get(&FrameTimeDiagnosticsPlugin::FPS)
                     .and_then(|fps| fps.smoothed())
                 {
-                    ui.label(String::from(format!("{}", value)));
+                    ui.label(String::from(format!("{:.1} FPS", value)));
                 }
 
                 if ui.button("Leave Editor").clicked() {
@@ -241,6 +242,7 @@ fn spawn_ui_cam(mut commands: Commands, mut egui_global_settings: ResMut<EguiGlo
         IsDefaultUiCamera,
         PrimaryEguiContext,
         Hdr,
+        Bloom::NATURAL,
         UICamera,
     ));
 }
@@ -393,7 +395,6 @@ fn pick_object_in_viewport(
             *last_selected = Some(ray_hit_data.entity)
         }
     } else {
-        println!("MeshPicking rien touché");
         for e in &existing {
             commands.entity(e).remove::<TransformGizmoFocus>();
         }

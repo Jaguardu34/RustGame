@@ -1,5 +1,8 @@
 use bevy::{
+    anti_alias::fxaa::Fxaa,
     camera::{Hdr, visibility::RenderLayers},
+    core_pipeline::prepass::{DeferredPrepass, DepthPrepass, MotionVectorPrepass},
+    post_process::{bloom::Bloom, motion_blur::MotionBlur},
     prelude::*,
 };
 
@@ -33,6 +36,8 @@ const PLAYER_HEIGHT_CROUCH: f32 = PLAYER_HEIGHT / 2.0; // 0.5
 //valeur capsule en crouch
 const PLAYER_HALF_LENGTH_CROUCH: f32 = PLAYER_HEIGHT_CROUCH / 2.0 - PLAYER_RADIUS; // 0.05
 
+const PLAYER_CYLINDER_HEIGHT_STAND: f32 = PLAYER_HALF_LENGTH_STAND * 2.0;
+
 #[derive(Component, Default)]
 pub struct Player;
 
@@ -56,6 +61,7 @@ pub struct PlayerVar {
     pub base_speed: f32,
     pub camera_sensitivity: Vec2,
     pub spawn_point: Vec3,
+    pub pickup_force: f32,
 }
 
 impl Default for PlayerVar {
@@ -71,6 +77,7 @@ impl Default for PlayerVar {
             base_speed: 6.0,
             camera_sensitivity: Vec2::new(0.003, 0.002),
             spawn_point: Vec3::new(0.0, 2.0, 0.0),
+            pickup_force: 20.0,
         } // Custom default value
     }
 }
@@ -96,8 +103,11 @@ pub fn default_player(
     (
         Player,
         Name::new("Player"),
-        CharacterControllerBundle::new(Collider::capsule(PLAYER_RADIUS, PLAYER_HALF_LENGTH_STAND))
-            .with_movement(30.0, 0.92, 4.0, 30f32.to_radians()),
+        CharacterControllerBundle::new(Collider::capsule(
+            PLAYER_RADIUS,
+            PLAYER_CYLINDER_HEIGHT_STAND,
+        ))
+        .with_movement(30.0, 0.92, 4.0, 30f32.to_radians()),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
         Mass(80.0),
@@ -114,19 +124,23 @@ pub fn default_player(
         children![(
             //camera of the player
             Camera3d::default(),
-            Name::new("PlayerCamera"),
+            //Name::new("PlayerCamera"),
+            MotionBlur {
+                shutter_angle: 1.0,
+                samples: 1,
+            },
             Camera {
                 is_active: true,
                 order: 0,
                 ..default()
             },
-            Transform::from_xyz(0.0, 0.5, 0.0),
+            Transform::from_xyz(0.0, 0.4, 0.0),
             PlayerCamera,
             Projection::from(PerspectiveProjection {
                 fov: 90.0_f32.to_radians(),
                 ..default()
             }),
-            //Bloom::NATURAL,
+            Bloom::NATURAL,
             Hdr,
             Msaa::Off,
             GameViewCam,
@@ -135,9 +149,9 @@ pub fn default_player(
                 SpotLight {
                     range: 30.0,
                     shadow_maps_enabled: true,
-                    inner_angle: 0.4,
-                    intensity: 1_000_000.0,
-                    outer_angle: 0.8,
+                    inner_angle: 0.2,
+                    intensity: 10_000_000.0,
+                    outer_angle: 0.25,
                     ..default()
                 },
                 Name::new("PlayerFlashlight"),

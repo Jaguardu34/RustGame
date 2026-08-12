@@ -3,17 +3,22 @@ use bevy::prelude::*;
 use bevy_inspector_egui::bevy_egui::EguiGlobalSettings;
 use rand::random_range;
 
-use crate::{
-    pick_object::PlayerPickable,
-    player::{PlayerCamera, default_player},
-};
+use crate::{pick_object::PlayerPickable, player::default_player};
 
 pub struct ScenePlugin;
 
 impl Plugin for ScenePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (setup_meshes, setup_lights, setup_player))
-            .add_systems(Update, spawn_object);
+        app.add_systems(
+            Startup,
+            (
+                setup_meshes,
+                setup_lights,
+                setup_player,
+                //spawn_gpu_instancing_test,
+            ),
+        )
+        .add_systems(Update, spawn_object);
     }
 }
 
@@ -59,6 +64,9 @@ fn setup_meshes(
         Transform::from_xyz(0.0, 2.0, 0.0),
         RigidBody::Dynamic,
         Collider::cuboid(1.0, 1.0, 1.0),
+        PlayerPickable,
+
+        Mass(100.0),
     ));
 
     commands.spawn((
@@ -70,11 +78,26 @@ fn setup_meshes(
 
     commands.spawn((
         Mesh3d(meshes.add(Capsule3d::new(0.2, 0.2))),
-        MeshMaterial3d(materials.add(Color::srgb(0.0, 1.0, 0.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            emissive: LinearRgba::rgb(0.0, 50.0, 0.0),
+            ..default()
+        })),
         RigidBody::Dynamic,
         Collider::capsule(0.2, 0.2),
         Transform::from_xyz(2.0, 2.0, 2.0),
         PlayerPickable,
+
+    ));
+
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.5, 0.5, 1.0))),
+        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.5, 0.2))),
+        RigidBody::Dynamic,
+        Collider::cuboid(0.5, 0.5, 1.0),
+        Transform::from_xyz(5.0, 2.0, 5.0),
+        GravityScale(0.05),
+        PlayerPickable,
+
     ));
 }
 
@@ -84,16 +107,39 @@ fn spawn_object(
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     if keyboard.pressed(KeyCode::KeyB) {
+        let asset: Handle<WorldAsset> =
+            asset_server.load(GltfAssetLabel::Scene(0).from_asset("farm_animals/Cow.gltf"));
         commands.spawn((
-            WorldAssetRoot(
-                asset_server
-                    .load(GltfAssetLabel::Scene(0).from_asset("fantasy_prop/Bottle_1.gltf")),
-            ),
-            Transform::from_xyz(random_range(-10.0..-5.0), 4., random_range(-10.0..-5.0)),
-            ColliderConstructorHierarchy::new(ColliderConstructor::ConvexHullFromMesh),
+            WorldAssetRoot(asset),
+            Transform::from_xyz(random_range(-10.0..-5.0), 4., random_range(-10.0..-5.0))
+                .with_scale(Vec3::splat(0.2)),
+            ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
             RigidBody::Dynamic,
             ColliderDensity(0.8),
             PlayerPickable,
         ));
     }
+}
+
+fn spawn_gpu_instancing_test(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let mut counter = 0;
+    let mesh = meshes.add(Cuboid::new(0.2, 0.2, 0.2));
+    let material = materials.add(Color::srgb(0.1, 0.4, 0.1));
+    for x in -50..50 {
+        for y in 0..10 {
+            for z in -50..50 {
+                commands.spawn((
+                    Mesh3d(mesh.clone()),
+                    MeshMaterial3d(material.clone()),
+                    Transform::from_xyz(x as f32, y as f32 + 2.0, z as f32),
+                ));
+                counter += 1;
+            }
+        }
+    }
+    println!("Nombres d'objet spawn pr l'instancing : {}", counter)
 }

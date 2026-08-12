@@ -1,6 +1,7 @@
 use bevy::{
     camera::{Hdr, visibility::RenderLayers},
     camera_controller::free_camera::FreeCamera,
+    post_process::bloom::Bloom,
     prelude::*,
     window::{CursorGrabMode, CursorOptions},
 };
@@ -47,7 +48,7 @@ pub fn spawn_free_cam(
         GameViewCam,
         TransformGizmoCamera,
         MeshPickingCamera,
-        //Bloom::NATURAL,
+        Bloom::NATURAL,
         projection.clone(),
         Transform::from_translation(player_cam_transform.translation())
             .with_rotation(player_cam_transform.rotation()),

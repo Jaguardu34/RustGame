@@ -1,7 +1,10 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
 
-use crate::player::{Player, PlayerCamera};
+use crate::{
+    editor::EditorState,
+    player::{Player, PlayerCamera, PlayerVar},
+};
 
 #[derive(Component)]
 pub struct PlayerPickable;
@@ -46,7 +49,11 @@ fn update_can_pick(
     mut object_picked: ResMut<ObjectPicked>,
     mouse: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    editor_state: Res<EditorState>,
 ) {
+    if !editor_state.game_playing {
+        return;
+    }
     let Ok(cam_transform) = player_cam_query.single() else {
         return;
     };
@@ -111,23 +118,47 @@ fn find_pickable_ancestor(
 
 fn pickup_object(
     player_camera_query: Query<&GlobalTransform, With<PlayerCamera>>,
+    player_query: Query<Entity, With<Player>>,
     object_picked: Res<ObjectPicked>,
-    mut transform_query: Query<(&mut LinearVelocity, &mut AngularVelocity, &GlobalTransform)>,
+    transform_query: Query<&GlobalTransform>,
+    mut physics_query: Query<Forces>, // Récupère aussi la vitesse actuelle
+    player_var: Res<PlayerVar>,
+    collisions: Collisions,
 ) {
-    let Ok(cam_transform) = player_camera_query.single() else {
-        return;
-    };
-    let Some(entity) = object_picked.entity else {
-        return;
-    };
-    let hand_pos =
-        cam_transform.translation() + cam_transform.forward().as_vec3() * object_picked.distance;
-    let Ok((mut velocity, mut angular_velocity, transform)) = transform_query.get_mut(entity)
-    else {
+    let Ok(player_entity) = player_query.single() else {
         return;
     };
 
-    let diff = hand_pos - transform.translation();
-    velocity.0 = diff * FORCE;
-    angular_velocity.0 = Vec3::ZERO;
+    let Some(entity) = object_picked.entity else {
+        return;
+    };
+
+    if let Some(_collide) = collisions.get(player_entity, entity) {
+        return;
+    } else {
+        let Ok(cam_transform) = player_camera_query.single() else {
+            return;
+        };
+
+        let hand_pos =
+            cam_transform.translation() + cam_transform.forward() * object_picked.distance;
+
+        let Ok(transform) = transform_query.get(entity) else {
+            return;
+        };
+
+        let Ok(mut force) = physics_query.get_mut(entity) else {
+            return;
+        };
+        let diff = hand_pos - transform.translation();
+
+        // 1. Force d'attraction vers la main
+        let attraction = diff * player_var.pickup_force;
+
+        // 2. Amortissement basé sur la vitesse actuelle (évite de dépasser la cible)
+        let damping_factor = 5.0; // Ajustez ce facteur au besoin
+        let damping = -force.linear_velocity() * damping_factor;
+
+        force.apply_force(attraction + damping);
+    }
 }
