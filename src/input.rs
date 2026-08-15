@@ -2,7 +2,7 @@ use crate::editor::EditorState;
 use crate::game_var::GameVar;
 use crate::player::{Player, PlayerCamera};
 
-use avian3d::prelude::*;
+use avian3d::debug_render::PhysicsGizmos;
 use bevy::{
     input::mouse::AccumulatedMouseMotion,
     prelude::*,
@@ -23,7 +23,7 @@ impl Plugin for PlayerInputPlugin {
                 handle_input,
                 grab_mouse,
                 handle_mouse_input,
-                toggle_physics_gizmos, //handle_movement_input,
+                toggle_physics_gizmos,
             ),
         );
     }
@@ -63,67 +63,6 @@ pub fn handle_input(
         } else {
             player_var.flashlight = true;
         }
-    }
-}
-
-fn handle_movement_input(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut player_var: ResMut<PlayerVar>,
-    mut player_query: Query<(&Transform, &mut LinearVelocity), With<Player>>,
-
-    editor_state: Res<EditorState>,
-) {
-    if !editor_state.game_playing {
-        return;
-    }
-
-    let Ok((transform, mut velocity)) = player_query.single_mut() else {
-        return;
-    };
-
-    let mut direction = Vec3::ZERO;
-
-    if keyboard.pressed(KeyCode::KeyW) {
-        direction += *transform.forward();
-    }
-    if keyboard.pressed(KeyCode::KeyS) {
-        direction += *transform.back();
-    }
-    if keyboard.pressed(KeyCode::KeyA) {
-        direction += *transform.left();
-    }
-    if keyboard.pressed(KeyCode::KeyD) {
-        direction += *transform.right();
-    }
-
-    direction.y = 0.0;
-    let direction = direction.normalize_or_zero();
-
-    let goal_speed = if player_var.sprinting {
-        player_var.base_speed * 2.5
-    } else if player_var.crouching {
-        player_var.base_speed / 3.0
-    } else {
-        player_var.base_speed
-    };
-
-    let target_velocity = Vec3::new(direction.x * goal_speed, 0.0, direction.z * goal_speed);
-    let current = Vec3::new(velocity.x, 0.0, velocity.z);
-    let new_vel = current.lerp(target_velocity, time.delta_secs() * 4.0);
-    velocity.x = new_vel.x;
-    velocity.z = new_vel.z;
-
-    if keyboard.pressed(KeyCode::ShiftLeft) && !player_var.crouching {
-        player_var.sprinting = true;
-    } else {
-        player_var.sprinting = false;
-    }
-
-    if keyboard.pressed(KeyCode::KeyC) && !player_var.sprinting {
-        player_var.crouching = true;
-    } else {
-        player_var.crouching = false;
     }
 }
 

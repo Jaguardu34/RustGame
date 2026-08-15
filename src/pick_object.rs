@@ -36,9 +36,6 @@ impl Plugin for PlayerPickUpPlugin {
     }
 }
 
-const FORCE: f32 = 10.0;
-const PICK_DISTANCE: f32 = 3.0;
-
 fn update_can_pick(
     spatial_query: SpatialQuery,
     player_cam_query: Query<&GlobalTransform, With<PlayerCamera>>,
@@ -50,6 +47,7 @@ fn update_can_pick(
     mouse: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     editor_state: Res<EditorState>,
+    player_var: Res<PlayerVar>,
 ) {
     if !editor_state.game_playing {
         return;
@@ -70,7 +68,9 @@ fn update_can_pick(
         } else if keyboard.pressed(KeyCode::KeyH) {
             object_picked.distance += 0.05;
         }
-        object_picked.distance = object_picked.distance.clamp(0.5, 2.0);
+        object_picked.distance = object_picked
+            .distance
+            .clamp(player_var.pickup_distance[0], player_var.pickup_distance[1]);
         return;
     }
 
@@ -81,7 +81,7 @@ fn update_can_pick(
     let hit = spatial_query.cast_ray_predicate(
         origin,
         direction,
-        PICK_DISTANCE,
+        player_var.pickup_distance[1],
         true,
         &filter,
         &|entity| find_pickable_ancestor(entity, &pickable_query, &parents).is_some(),
@@ -91,7 +91,9 @@ fn update_can_pick(
 
     if let Some(hit_data) = hit {
         if mouse.just_pressed(MouseButton::Left) {
-            object_picked.distance = hit_data.distance.clamp(0.5, 2.0);
+            object_picked.distance = hit_data
+                .distance
+                .clamp(player_var.pickup_distance[0], player_var.pickup_distance[1]);
 
             object_picked.entity =
                 find_pickable_ancestor(hit_data.entity, &pickable_query, &parents);

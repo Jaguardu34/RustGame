@@ -1,7 +1,5 @@
 use bevy::{
-    anti_alias::fxaa::Fxaa,
     camera::{Hdr, visibility::RenderLayers},
-    core_pipeline::prepass::{DeferredPrepass, DepthPrepass, MotionVectorPrepass},
     post_process::{bloom::Bloom, motion_blur::MotionBlur},
     prelude::*,
 };
@@ -11,7 +9,8 @@ use bevy_inspector_egui::{InspectorOptions, inspector_options::ReflectInspectorO
 use std::time::Duration;
 
 use crate::{
-    character_controller::CharacterControllerBundle, editor::GameViewCam, game_var::GameVar,
+    character_controller::CharacterControllerBundle, editor::GameViewCam,
+    post_process::CustomPostProcessSettings,
 };
 
 //tick timer for ui
@@ -62,6 +61,7 @@ pub struct PlayerVar {
     pub camera_sensitivity: Vec2,
     pub spawn_point: Vec3,
     pub pickup_force: f32,
+    pub pickup_distance: [f32; 2],
 }
 
 impl Default for PlayerVar {
@@ -78,6 +78,7 @@ impl Default for PlayerVar {
             camera_sensitivity: Vec2::new(0.003, 0.002),
             spawn_point: Vec3::new(0.0, 2.0, 0.0),
             pickup_force: 20.0,
+            pickup_distance: [1., 3.],
         } // Custom default value
     }
 }
@@ -140,9 +141,11 @@ pub fn default_player(
                 fov: 90.0_f32.to_radians(),
                 ..default()
             }),
-            Bloom::NATURAL,
-            Hdr,
-            Msaa::Off,
+            (Bloom::NATURAL, Hdr, Msaa::Off),
+            CustomPostProcessSettings {
+                intensity: 0.02,
+                ..default()
+            },
             GameViewCam,
             children![(
                 //flashlight of the player

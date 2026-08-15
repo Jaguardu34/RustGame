@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy_inspector_egui::bevy_egui::EguiGlobalSettings;
 use rand::random_range;
 
-use crate::{pick_object::PlayerPickable, player::default_player};
+use crate::{grass::GrassPlane, pick_object::PlayerPickable, player::default_player};
 
 pub struct ScenePlugin;
 
@@ -15,6 +15,7 @@ impl Plugin for ScenePlugin {
                 setup_meshes,
                 setup_lights,
                 setup_player,
+                spawn_grass_plane,
                 //spawn_gpu_instancing_test,
             ),
         )
@@ -57,6 +58,7 @@ fn setup_meshes(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
@@ -65,7 +67,6 @@ fn setup_meshes(
         RigidBody::Dynamic,
         Collider::cuboid(1.0, 1.0, 1.0),
         PlayerPickable,
-
         Mass(100.0),
     ));
 
@@ -82,11 +83,11 @@ fn setup_meshes(
             emissive: LinearRgba::rgb(0.0, 50.0, 0.0),
             ..default()
         })),
-        RigidBody::Dynamic,
+        //RigidBody::Dynamic,
         Collider::capsule(0.2, 0.2),
         Transform::from_xyz(2.0, 2.0, 2.0),
         PlayerPickable,
-
+        TransformGizmoFocus,
     ));
 
     commands.spawn((
@@ -97,8 +98,11 @@ fn setup_meshes(
         Transform::from_xyz(5.0, 2.0, 5.0),
         GravityScale(0.05),
         PlayerPickable,
-
     ));
+
+    let asset: Handle<WorldAsset> = asset_server
+        .load(GltfAssetLabel::Scene(0).from_asset("mega_nature/glTF/Grass_Common_Short.gltf"));
+    commands.spawn((WorldAssetRoot(asset), Transform::from_xyz(20., 1., 20.)));
 }
 
 fn spawn_object(
@@ -142,4 +146,20 @@ fn spawn_gpu_instancing_test(
         }
     }
     println!("Nombres d'objet spawn pr l'instancing : {}", counter)
+}
+
+pub fn spawn_grass_plane(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands.spawn((
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(10.0, 10.0).subdivisions(10))),
+        MeshMaterial3d(materials.add(Color::srgb(0.0, 1.0, 0.0))),
+        GrassPlane {
+            size: Vec2::new(10.0, 10.0),
+            density: 0.1,
+        },
+        Transform::from_xyz(-10., 0.51, -10.),
+    ));
 }

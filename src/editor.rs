@@ -30,12 +30,12 @@ impl Plugin for EditorPlugin {
             .add_systems(Update, check_editor_state_change)
             .add_systems(
                 Update,
-                (update_transform_gizmo_settings, pause_app).run_if(check_if_in_editor),
+                (update_transform_gizmo_settings, pause_app, draw_gizmo).run_if(check_if_in_editor),
             )
             //custom gizmo
             .add_systems(
                 Update,
-                (draw_gizmo, pick_object_in_viewport)
+                (pick_object_in_viewport)
                     .run_if(check_if_in_editor)
                     .after(set_camera_viewport),
             )
@@ -244,6 +244,7 @@ fn spawn_ui_cam(mut commands: Commands, mut egui_global_settings: ResMut<EguiGlo
         Hdr,
         Bloom::NATURAL,
         UICamera,
+        TransformGizmoCamera,
     ));
 }
 

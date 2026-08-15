@@ -1,4 +1,5 @@
 use avian3d::prelude::*;
+
 use bevy::{camera_controller::free_camera::FreeCameraPlugin, prelude::*};
 
 pub mod editor;
@@ -11,7 +12,8 @@ use crate::character_controller::CharacterControllerPlugin;
 use crate::editor::EditorPlugin;
 use crate::game_var::GameVar;
 
-use crate::player::PlayerPlugin;
+use crate::grass::GrassPlugin;
+use crate::player::{PlayerCamera, PlayerPlugin};
 use crate::scene::ScenePlugin;
 
 pub mod player_ui;
@@ -30,10 +32,19 @@ use pick_object::PlayerPickUpPlugin;
 
 pub mod water;
 
+pub mod post_process;
+//use post_process::PostProcessPluginCustom;
+
+pub mod grass;
+
 fn main() {
     App::new()
         .init_resource::<GameVar>()
-        .add_plugins((DefaultPlugins, PhysicsPlugins::default()))
+        .add_plugins((
+            DefaultPlugins,
+            PhysicsPlugins::default(),
+            //PostProcessPluginCustom,
+        ))
         //for debugging physics
         .add_plugins(PhysicsDebugPlugin)
         // Overwrite default debug rendering configuration (optional)
@@ -46,13 +57,14 @@ fn main() {
         )
         .add_plugins((EditorPlugin, FreeCameraPlugin, TransformGizmoPlugin))
         .add_plugins(ScenePlugin)
-        .add_plugins(CharacterControllerPlugin)
         .add_plugins((
             PlayerPlugin,
             PlayerInputPlugin,
             PlayerPickUpPlugin,
+            CharacterControllerPlugin,
             UiPlugin,
             FreeCamPlugin,
+            GrassPlugin,
         ))
         .run();
 }
